@@ -2,10 +2,7 @@ package com.finbridge.service.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.ProtocolResultDTO;
-import com.finbridge.model.entity.ProtocolResult;
-import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
-import com.finbridge.repository.ProtocolResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
@@ -23,10 +20,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BatchAdapterService implements ProtocolAdapter {
 
-    private final ProtocolResultRepository protocolResultRepository;
     private final JobLauncher jobLauncher;
     private final Job integrationJob;
     private final ObjectMapper objectMapper;
+    private final Object batchLaunchLock = new Object();
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
@@ -40,21 +37,20 @@ public class BatchAdapterService implements ProtocolAdapter {
                     .addLong("timestamp", System.currentTimeMillis())
                     .toJobParameters();
 
-            JobExecution execution = jobLauncher.run(integrationJob, params);
+            JobExecution execution;
+            synchronized (batchLaunchLock) {
+                execution = jobLauncher.run(integrationJob, params);
+            }
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
             BatchStatus batchStatus = execution.getStatus();
 
             if (batchStatus == BatchStatus.COMPLETED) {
                 log.info("[BATCH] {} - 완료 ({}ms)", requestId, executionTimeMs);
-                saveResult(requestId, ResultStatus.SUCCESS, "200",
-                        "배치 작업 완료 (jobId: " + execution.getJobId() + ")", executionTimeMs);
                 return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
                         "배치 작업 완료 (jobId: " + execution.getJobId() + ")", executionTimeMs);
             } else {
                 log.warn("[BATCH] {} - 비정상 종료: {}", requestId, batchStatus);
-                saveResult(requestId, ResultStatus.FAILED, "500",
-                        "배치 상태: " + batchStatus, executionTimeMs);
                 return new ProtocolResultDTO(ResultStatus.FAILED, "500",
                         "배치 상태: " + batchStatus, executionTimeMs);
             }
@@ -63,20 +59,7 @@ public class BatchAdapterService implements ProtocolAdapter {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[BATCH] {} - 실패: {}", requestId, e.getMessage());
 
-            saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
         }
-    }
-
-    private void saveResult(String requestId, ResultStatus status,
-                            String code, String message, Long executionTimeMs) {
-        ProtocolResult result = new ProtocolResult();
-        result.setRequestId(requestId);
-        result.setProtocol(ProtocolType.BATCH);
-        result.setStatus(status);
-        result.setResponseCode(code);
-        result.setResponseMessage(message);
-        result.setExecutionTimeMs(executionTimeMs);
-        protocolResultRepository.save(result);
     }
 }

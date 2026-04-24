@@ -9,7 +9,10 @@ import com.finbridge.repository.SystemLogRepository;
 import com.finbridge.service.IntegrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.AbstractPageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,23 +61,19 @@ public class IntegrationController {
 
         log.info("[API] GET /api/logs - protocol={}, limit={}, offset={}", protocol, limit, offset);
 
-        List<SystemLog> logs;
+        Pageable pageable = new OffsetBasedPageRequest(offset, limit, Sort.by("timestamp").descending());
+        Page<SystemLog> page;
 
         if (protocol != null && !protocol.isBlank()) {
             ProtocolType protocolType = ProtocolType.valueOf(protocol.toUpperCase());
-            logs = systemLogRepository.findByProtocolOrderByTimestampDesc(protocolType);
+            page = systemLogRepository.findByProtocol(protocolType, pageable);
         } else {
-            logs = systemLogRepository.findAll(
-                    PageRequest.of(offset / limit, limit,
-                            org.springframework.data.domain.Sort.by("timestamp").descending())
-            ).getContent();
+            page = systemLogRepository.findAll(pageable);
         }
 
-        long total = systemLogRepository.count();
+        long total = page.getTotalElements();
 
-        List<LogResponseDTO.LogItem> logItems = logs.stream()
-                .skip(protocol != null ? offset : 0)
-                .limit(limit)
+        List<LogResponseDTO.LogItem> logItems = page.getContent().stream()
                 .map(l -> new LogResponseDTO.LogItem(
                         l.getId(),
                         l.getRequestId(),
@@ -86,5 +85,52 @@ public class IntegrationController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(new LogResponseDTO(total, limit, offset, logItems));
+    }
+
+    private static class OffsetBasedPageRequest extends AbstractPageRequest {
+
+        private final long offset;
+        private final Sort sort;
+
+        private OffsetBasedPageRequest(long offset, int limit, Sort sort) {
+            super((int) (offset / limit), limit);
+            if (offset < 0) {
+                throw new IllegalArgumentException("Offset must not be negative");
+            }
+            this.offset = offset;
+            this.sort = sort;
+        }
+
+        @Override
+        public long getOffset() {
+            return offset;
+        }
+
+        @Override
+        public Sort getSort() {
+            return sort;
+        }
+
+        @Override
+        public Pageable next() {
+            return new OffsetBasedPageRequest(offset + getPageSize(), getPageSize(), sort);
+        }
+
+        @Override
+        public Pageable previous() {
+            return hasPrevious()
+                    ? new OffsetBasedPageRequest(offset - getPageSize(), getPageSize(), sort)
+                    : this;
+        }
+
+        @Override
+        public Pageable first() {
+            return new OffsetBasedPageRequest(0, getPageSize(), sort);
+        }
+
+        @Override
+        public Pageable withPage(int pageNumber) {
+            return new OffsetBasedPageRequest((long) pageNumber * getPageSize(), getPageSize(), sort);
+        }
     }
 }

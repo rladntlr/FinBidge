@@ -2,10 +2,7 @@ package com.finbridge.service.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.ProtocolResultDTO;
-import com.finbridge.model.entity.ProtocolResult;
-import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
-import com.finbridge.repository.ProtocolResultRepository;
 import com.jcraft.jsch.ChannelSftp;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
@@ -24,7 +21,6 @@ import java.util.Properties;
 @RequiredArgsConstructor
 public class SftpAdapterService implements ProtocolAdapter {
 
-    private final ProtocolResultRepository protocolResultRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${sftp.host}")
@@ -71,8 +67,6 @@ public class SftpAdapterService implements ProtocolAdapter {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.info("[SFTP] {} - 업로드 성공: {} ({}ms)", requestId, filename, executionTimeMs);
 
-            saveResult(requestId, ResultStatus.SUCCESS, "200",
-                    "파일 업로드 완료: " + uploadDir + "/" + filename, executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
                     "파일 업로드 완료: " + uploadDir + "/" + filename, executionTimeMs);
 
@@ -80,24 +74,11 @@ public class SftpAdapterService implements ProtocolAdapter {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[SFTP] {} - 실패: {}", requestId, e.getMessage());
 
-            saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
 
         } finally {
             if (channel != null && channel.isConnected()) channel.disconnect();
             if (session != null && session.isConnected()) session.disconnect();
         }
-    }
-
-    private void saveResult(String requestId, ResultStatus status,
-                            String code, String message, Long executionTimeMs) {
-        ProtocolResult result = new ProtocolResult();
-        result.setRequestId(requestId);
-        result.setProtocol(ProtocolType.SFTP);
-        result.setStatus(status);
-        result.setResponseCode(code);
-        result.setResponseMessage(message);
-        result.setExecutionTimeMs(executionTimeMs);
-        protocolResultRepository.save(result);
     }
 }

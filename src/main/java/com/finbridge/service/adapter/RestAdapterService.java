@@ -1,10 +1,7 @@
 package com.finbridge.service.adapter;
 
 import com.finbridge.model.dto.ProtocolResultDTO;
-import com.finbridge.model.entity.ProtocolResult;
-import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
-import com.finbridge.repository.ProtocolResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +14,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RestAdapterService implements ProtocolAdapter {
 
-    private final ProtocolResultRepository protocolResultRepository;
     private final WebClient.Builder webClientBuilder;
 
     @Override
@@ -38,27 +34,13 @@ public class RestAdapterService implements ProtocolAdapter {
             String message = response != null ? (String) response.get("message") : "응답 없음";
 
             log.info("[REST] {} - 성공 ({}ms): {}", requestId, executionTimeMs, message);
-            saveResult(requestId, ResultStatus.SUCCESS, "200", message, executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200", message, executionTimeMs);
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[REST] {} - 실패: {}", requestId, e.getMessage());
 
-            saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
         }
-    }
-
-    private void saveResult(String requestId, ResultStatus status,
-                            String code, String message, Long executionTimeMs) {
-        ProtocolResult result = new ProtocolResult();
-        result.setRequestId(requestId);
-        result.setProtocol(ProtocolType.REST);
-        result.setStatus(status);
-        result.setResponseCode(code);
-        result.setResponseMessage(message);
-        result.setExecutionTimeMs(executionTimeMs);
-        protocolResultRepository.save(result);
     }
 }

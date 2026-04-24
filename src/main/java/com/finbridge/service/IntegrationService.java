@@ -9,6 +9,7 @@ import com.finbridge.model.entity.ProtocolResult;
 import com.finbridge.model.entity.SystemLog;
 import com.finbridge.model.enums.EventType;
 import com.finbridge.model.enums.OverallStatus;
+import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.RequestStatus;
 import com.finbridge.model.enums.ResultStatus;
 import com.finbridge.repository.IntegrationRequestRepository;
@@ -105,7 +106,7 @@ public class IntegrationService {
                     .join();
 
             for (var entry : futures.entrySet()) {
-                results.put(entry.getKey(), entry.getValue().getNow(null));
+                results.put(entry.getKey(), normalizeResult(entry.getValue().getNow(null)));
             }
         } catch (CompletionException e) {
             log.warn("[INTEGRATION] {} - 일부 프로토콜 타임아웃 또는 실패", requestId);
@@ -115,7 +116,7 @@ public class IntegrationService {
                             ResultStatus.TIMEOUT, "504", "35초 내 응답 없음", 35000L));
                 } else {
                     try {
-                        results.put(entry.getKey(), entry.getValue().get());
+                        results.put(entry.getKey(), normalizeResult(entry.getValue().get()));
                     } catch (Exception ex) {
                         results.put(entry.getKey(), new ProtocolResultDTO(
                                 ResultStatus.FAILED, "500", ex.getMessage(), 0L));
@@ -123,6 +124,13 @@ public class IntegrationService {
                 }
             }
         }
+
+        results.forEach((protocol, result) -> {
+            ProtocolType protocolType = ProtocolType.valueOf(protocol);
+            saveProtocolResult(requestId, protocolType, result);
+            saveLog(requestId, protocolType, toEventType(result),
+                    protocol + " 처리 결과: " + result.getStatus());
+        });
 
         // [7-8] 전체 상태 판정
         OverallStatus overallStatus = determineOverallStatus(results);
@@ -174,6 +182,28 @@ public class IntegrationService {
         if (successCount == results.size()) return OverallStatus.ALL_SUCCESS;
         if (successCount == 0) return OverallStatus.ALL_FAILED;
         return OverallStatus.PARTIAL_FAILURE;
+    }
+
+    private ProtocolResultDTO normalizeResult(ProtocolResultDTO result) {
+        if (result != null) {
+            return result;
+        }
+        return new ProtocolResultDTO(ResultStatus.FAILED, "500", "프로토콜 결과 없음", 0L);
+    }
+
+    private void saveProtocolResult(String requestId, ProtocolType protocol, ProtocolResultDTO dto) {
+        ProtocolResult result = new ProtocolResult();
+        result.setRequestId(requestId);
+        result.setProtocol(protocol);
+        result.setStatus(dto.getStatus());
+        result.setResponseCode(dto.getResponseCode());
+        result.setResponseMessage(dto.getResponseMessage());
+        result.setExecutionTimeMs(dto.getExecutionTimeMs());
+        protocolResultRepository.save(result);
+    }
+
+    private EventType toEventType(ProtocolResultDTO result) {
+        return result.getStatus() == ResultStatus.SUCCESS ? EventType.SUCCESS : EventType.FAILED;
     }
 
     private void saveLog(String requestId, com.finbridge.model.enums.ProtocolType protocol,

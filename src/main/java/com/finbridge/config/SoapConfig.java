@@ -1,5 +1,7 @@
 package com.finbridge.config;
 
+import com.finbridge.soap.IntegrationSoapRequest;
+import com.finbridge.soap.IntegrationSoapResponse;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -43,7 +45,7 @@ public class SoapConfig {
     @Bean
     public Jaxb2Marshaller jaxb2Marshaller() {
         Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-        marshaller.setContextPath("com.finbridge.soap");
+        marshaller.setClassesToBeBound(IntegrationSoapRequest.class, IntegrationSoapResponse.class);
         return marshaller;
     }
 
