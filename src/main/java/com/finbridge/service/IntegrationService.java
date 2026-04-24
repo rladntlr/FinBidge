@@ -16,6 +16,7 @@ import com.finbridge.repository.ProtocolResultRepository;
 import com.finbridge.repository.SystemLogRepository;
 import com.finbridge.service.adapter.BatchAdapterService;
 import com.finbridge.service.adapter.KafkaAdapterService;
+import com.finbridge.service.adapter.RestAdapterService;
 import com.finbridge.service.adapter.SftpAdapterService;
 import com.finbridge.service.adapter.SoapAdapterService;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class IntegrationService {
     private final KafkaAdapterService kafkaAdapterService;
     private final SftpAdapterService sftpAdapterService;
     private final BatchAdapterService batchAdapterService;
+    private final RestAdapterService restAdapterService;
     private final ObjectMapper objectMapper;
 
     public IntegrationResponseDTO processIntegration(IntegrationRequestDTO request) {
@@ -88,6 +90,10 @@ public class IntegrationService {
         if (request.getProtocols().contains("BATCH")) {
             futures.put("BATCH", CompletableFuture.supplyAsync(
                     () -> batchAdapterService.execute(requestId, request.getPayload())));
+        }
+        if (request.getProtocols().contains("REST")) {
+            futures.put("REST", CompletableFuture.supplyAsync(
+                    () -> restAdapterService.execute(requestId, request.getPayload())));
         }
 
         // [6] 전체 완료 대기 (35초 timeout)

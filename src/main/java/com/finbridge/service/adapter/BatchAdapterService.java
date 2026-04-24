@@ -1,5 +1,6 @@
 package com.finbridge.service.adapter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.entity.ProtocolResult;
 import com.finbridge.model.enums.ProtocolType;
@@ -7,10 +8,15 @@ import com.finbridge.model.enums.ResultStatus;
 import com.finbridge.repository.ProtocolResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 @Slf4j
@@ -18,34 +24,47 @@ import java.util.UUID;
 public class BatchAdapterService implements ProtocolAdapter {
 
     private final ProtocolResultRepository protocolResultRepository;
+    private final JobLauncher jobLauncher;
+    private final Job integrationJob;
+    private final ObjectMapper objectMapper;
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
         long startTime = System.currentTimeMillis();
-        String batchId = "BATCH-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-        log.info("[BATCH] {} - 배치 작업 제출 시작: {}", requestId, batchId);
+        log.info("[BATCH] {} - 배치 작업 실행 시작", requestId);
 
         try {
-            // Spring Batch Job 제출 모의 (50ms)
-            Thread.sleep(50);
+            JobParameters params = new JobParametersBuilder()
+                    .addString("requestId", requestId)
+                    .addString("payload", objectMapper.writeValueAsString(payload))
+                    .addLong("timestamp", System.currentTimeMillis())
+                    .toJobParameters();
+
+            JobExecution execution = jobLauncher.run(integrationJob, params);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
-            log.info("[BATCH] {} - 제출 성공: {} ({}ms)", requestId, batchId, executionTimeMs);
+            BatchStatus batchStatus = execution.getStatus();
 
-            saveResult(requestId, ResultStatus.SUCCESS, "200",
-                    "배치 작업 제출 완료 (batchId: " + batchId + ")", executionTimeMs);
-
-            return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
-                    "배치 작업 제출 완료 (batchId: " + batchId + ")", executionTimeMs);
+            if (batchStatus == BatchStatus.COMPLETED) {
+                log.info("[BATCH] {} - 완료 ({}ms)", requestId, executionTimeMs);
+                saveResult(requestId, ResultStatus.SUCCESS, "200",
+                        "배치 작업 완료 (jobId: " + execution.getJobId() + ")", executionTimeMs);
+                return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
+                        "배치 작업 완료 (jobId: " + execution.getJobId() + ")", executionTimeMs);
+            } else {
+                log.warn("[BATCH] {} - 비정상 종료: {}", requestId, batchStatus);
+                saveResult(requestId, ResultStatus.FAILED, "500",
+                        "배치 상태: " + batchStatus, executionTimeMs);
+                return new ProtocolResultDTO(ResultStatus.FAILED, "500",
+                        "배치 상태: " + batchStatus, executionTimeMs);
+            }
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[BATCH] {} - 실패: {}", requestId, e.getMessage());
 
             saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
-
-            return new ProtocolResultDTO(ResultStatus.FAILED, "500",
-                    e.getMessage(), executionTimeMs);
+            return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
         }
     }
 
