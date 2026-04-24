@@ -50,15 +50,15 @@
 | 프로토콜 | 구현 방식 | 목적 |
 |---------|---------|------|
 | **REST API** | 실제 구현 | 메인 인터페이스, CRUD |
-| **SOAP** | 모의 서버 | 레거시 시스템 시뮬레이션 |
-| **MQ** | 실제 구현 (RabbitMQ) | 비동기 작업 처리 |
-| **Batch** | 모의 구현 | 정시 작업 스케줄링 |
-| **SFTP** | 모의 서버 | 파일 전송 시뮬레이션 |
+| **SOAP** | 실제 구현 (Apache CXF) | 레거시 시스템 연동 |
+| **MQ** | 실제 구현 (Kafka) | 비동기 메시지 처리 |
+| **Batch** | 실제 구현 (Spring Batch) | 정시 작업 스케줄링 |
+| **SFTP** | 실제 구현 (JSch) | 파일 전송 |
 
 **핵심 아이디어:** 
-- 실제로 구현할 것: REST API, MQ (이 둘이 통합의 핵심)
-- 모의로 대체할 것: SOAP, SFTP, Batch (프로토콜 호출 흐름만 증명)
-- 결과: 5개 모두 "동작"하지만, 개발 시간 크게 단축
+- 5개 프로토콜 모두 실제 구현 (완전한 통합 시스템)
+- 바이브 코딩으로 빠른 개발 가능
+- 결과: 프로덕션 수준의 포트폴리오
 
 ---
 
@@ -96,51 +96,60 @@ finbridge-portfolio/
 - 요청/응답 모델 정의
 - 기본 에러 핸들링
 
-### Phase 3: MQ 통합 (6시간)
-- RabbitMQ 로컬 구성 (Docker)
-- RabbitMqConfig 작성
+### Phase 3: Kafka 통합 (6시간)
+- Kafka 로컬 구성 (Docker)
+- KafkaConfig 작성
 - 메시지 publish/subscribe 구현
-- 데드레터 큐(DLQ) 처리
+- 데드레터 토픽 처리
 - 통합 테스트
 
-### Phase 4: SOAP/SFTP/Batch 모의 구현 (8시간)
-각 서비스마다:
-- Mock 클래스 구현 (실제 외부 호출 없음)
-- 요청 수신 → 응답 반환 로직
-- 로깅 추가
+### Phase 4: SOAP/SFTP/Batch 실제 구현 (10시간)
 
-**SOAP 모의:**
+**SOAP (Apache CXF):**
 ```java
 // SoapAdapterService.java
-public SoapResponse callLegacySystem(SoapRequest request) {
-    // 실제 SOAP 호출 대신 모의 응답 반환
-    return SoapResponse.builder()
-        .status("SUCCESS")
-        .data("Mock legacy system response")
-        .build();
-}
-```
-
-**MQ 실제:**
-```java
-// MqService.java
 @Service
-public class MqService {
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
-    
-    public void sendMessage(String message) {
-        rabbitTemplate.convertAndSend("integration-queue", message);
+public class SoapAdapterService {
+    // Apache CXF로 SOAP 엔드포인트 호출
+    public SoapResponse callLegacySystem(String payload) {
+        // 실제 SOAP 통신
     }
 }
 ```
 
-**SFTP 모의:**
+**Kafka 실제:**
+```java
+// KafkaService.java
+@Service
+public class KafkaService {
+    @Autowired
+    private KafkaTemplate<String, String> kafkaTemplate;
+    
+    public void sendMessage(String topic, String message) {
+        kafkaTemplate.send(topic, message);
+    }
+}
+```
+
+**SFTP (JSch):**
 ```java
 // SftpAdapterService.java
-public boolean uploadFile(String filename, byte[] data) {
-    // 실제 SFTP 대신 로컬 파일로 저장
-    return true;  // 성공 모의
+@Service
+public class SftpAdapterService {
+    // JSch로 SFTP 서버 연동
+    public boolean uploadFile(String host, String filename, byte[] data) {
+        // 실제 SFTP 파일 전송
+    }
+}
+```
+
+**Spring Batch:**
+```java
+// BatchJobConfig.java
+@Configuration
+public class BatchJobConfig {
+    // Spring Batch Job 구현
+    // 정시 작업 스케줄링
 }
 ```
 
@@ -165,12 +174,15 @@ public boolean uploadFile(String filename, byte[] data) {
 | 레이어 | 선택 | 이유 |
 |-------|------|------|
 | **프레임워크** | Spring Boot 3.x | 금융사 표준, 빠른 개발 |
-| **메시지 큐** | RabbitMQ | 가장 널리 사용, Docker로 쉽게 실행 |
-| **배치** | Spring Batch | Spring 생태계, 문서 풍부 |
+| **메시지 큐** | Kafka | 고성능, 이벤트 기반 아키텍처 |
+| **배치** | Spring Batch | Spring 생태계, 정시 작업 표준 |
+| **DB** | MySQL (Docker) | 금융사 표준, Flyway 마이그레이션 |
+| **DB 마이그레이션** | Flyway | 버전 관리, 자동 스키마 구성 |
+| **SOAP** | Apache CXF | 레거시 시스템 연동 표준 |
+| **SFTP** | JSch | 파일 전송 표준 라이브러리 |
 | **테스트** | JUnit 5 + Mockito | 표준 |
-| **빌드** | Maven | 금융사 선호 |
+| **빌드** | Gradle | 유연한 빌드 구성 |
 | **UI** | Thymeleaf + Bootstrap | 간단하고 빠름 |
-| **DB** | H2 (인메모리) | 별도 DB 없이 실행 가능 |
 
 ---
 
@@ -219,13 +231,14 @@ finbridge-portfolio/
 
 ## 다음 단계
 
-1. **지금 (4/24 오후):** 이 아키텍처 문서 검토 + 프로젝트 구조 생성
-2. **오늘 밤:** REST API + MQ 구현 완료
-3. **내일 오전:** SOAP/SFTP/Batch 모의 구현
-4. **내일 오후:** 통합 테스트 + UI 완성
-5. **내일 저녁:** 문서 정리 + 제출 준비
+1. **지금 (4/24 오후):** 아키텍처 문서 검토 + 프로젝트 구조 생성
+2. **오늘 밤:** REST API + Kafka 구현 완료
+3. **내일 오전:** SOAP(CXF) + SFTP(JSch) 실제 구현
+4. **내일 정오:** Spring Batch + 통합 테스트
+5. **내일 오후:** UI 완성 + 문서 정리
+6. **내일 저녁:** 최종 검수 + 제출 준비
 
-**타임라인: 32-36시간 (여유 12-16시간)**
+**타임라인: 36-40시간 (여유 8-12시간)**
 
 ---
 
