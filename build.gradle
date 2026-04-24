@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.6'
+    id 'org.springframework.boot' version '3.4.4'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -50,8 +50,16 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
-    // Apache CXF (SOAP)
-    implementation 'org.apache.cxf:cxf-spring-boot-starter-jaxws:4.0.0'
+    // Spring-WS (SOAP)
+    implementation 'org.springframework.boot:spring-boot-starter-web-services'
+    implementation 'wsdl4j:wsdl4j'
+
+    // JAXB (Java 11+에서 기본 제거됨)
+    implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
+    runtimeOnly 'com.sun.xml.bind:jaxb-impl:4.0.5'
+
+    // WebFlux (WebClient - REST 어댑터용)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
     // JSch (SFTP)
     implementation 'com.jcraft:jsch:0.1.55'
@@ -65,4 +73,8 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+tasks.named('bootJar') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

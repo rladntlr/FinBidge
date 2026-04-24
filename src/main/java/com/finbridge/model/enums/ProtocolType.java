@@ -4,5 +4,6 @@ public enum ProtocolType {
     SOAP,
     KAFKA,
     SFTP,
-    BATCH
+    BATCH,
+    REST
 }

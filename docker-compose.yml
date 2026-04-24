@@ -47,9 +47,21 @@ services:
     networks:
       - finbridge-network
 
+  sftp:
+    image: atmoz/sftp:latest
+    container_name: finbridge-sftp
+    command: finbridge:finbridge123:::upload
+    ports:
+      - "2222:22"
+    volumes:
+      - sftp_data:/home/finbridge/upload
+    networks:
+      - finbridge-network
+
 volumes:
   mysql_data:
   kafka_data:
+  sftp_data:
 
 networks:
   finbridge-network:

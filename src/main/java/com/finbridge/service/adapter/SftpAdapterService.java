@@ -1,18 +1,23 @@
 package com.finbridge.service.adapter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.entity.ProtocolResult;
 import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
 import com.finbridge.repository.ProtocolResultRepository;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Properties;
 
 @Service
 @Slf4j
@@ -20,6 +25,22 @@ import java.util.Map;
 public class SftpAdapterService implements ProtocolAdapter {
 
     private final ProtocolResultRepository protocolResultRepository;
+    private final ObjectMapper objectMapper;
+
+    @Value("${sftp.host}")
+    private String host;
+
+    @Value("${sftp.port}")
+    private int port;
+
+    @Value("${sftp.username}")
+    private String username;
+
+    @Value("${sftp.password}")
+    private String password;
+
+    @Value("${sftp.upload-dir}")
+    private String uploadDir;
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
@@ -27,31 +48,44 @@ public class SftpAdapterService implements ProtocolAdapter {
         String filename = "finbridge-" + requestId + ".json";
         log.info("[SFTP] {} - 파일 업로드 시작: {}", requestId, filename);
 
-        try {
-            // JSch SFTP 업로드 모의 (500ms 네트워크 지연)
-            Thread.sleep(500);
+        Session session = null;
+        ChannelSftp channel = null;
 
-            // 로컬 /tmp에 파일 저장
-            Path path = Paths.get("/tmp/" + filename);
-            Files.writeString(path, payload.toString());
+        try {
+            String json = objectMapper.writeValueAsString(payload);
+            byte[] content = json.getBytes(StandardCharsets.UTF_8);
+
+            JSch jsch = new JSch();
+            session = jsch.getSession(username, host, port);
+            session.setPassword(password);
+
+            Properties config = new Properties();
+            config.put("StrictHostKeyChecking", "no");
+            session.setConfig(config);
+            session.connect(10_000);
+
+            channel = (ChannelSftp) session.openChannel("sftp");
+            channel.connect();
+            channel.put(new ByteArrayInputStream(content), uploadDir + "/" + filename);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
-            log.info("[SFTP] {} - 업로드 성공: {} ({}ms)", requestId, path, executionTimeMs);
+            log.info("[SFTP] {} - 업로드 성공: {} ({}ms)", requestId, filename, executionTimeMs);
 
             saveResult(requestId, ResultStatus.SUCCESS, "200",
-                    "파일 업로드 완료: " + filename, executionTimeMs);
-
+                    "파일 업로드 완료: " + uploadDir + "/" + filename, executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
-                    "파일 업로드 완료: " + filename, executionTimeMs);
+                    "파일 업로드 완료: " + uploadDir + "/" + filename, executionTimeMs);
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[SFTP] {} - 실패: {}", requestId, e.getMessage());
 
             saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
+            return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
 
-            return new ProtocolResultDTO(ResultStatus.FAILED, "500",
-                    e.getMessage(), executionTimeMs);
+        } finally {
+            if (channel != null && channel.isConnected()) channel.disconnect();
+            if (session != null && session.isConnected()) session.disconnect();
         }
     }
 

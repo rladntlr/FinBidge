@@ -38,6 +38,13 @@ spring:
     job:
       enabled: false
 
+sftp:
+  host: localhost
+  port: 2222
+  username: finbridge
+  password: finbridge123
+  upload-dir: /upload
+
 server:
   port: 8080
 

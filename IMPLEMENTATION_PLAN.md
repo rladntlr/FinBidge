@@ -6,6 +6,41 @@
 
 ---
 
+## 0. 프로토콜별 실제 금융 IT 사용 예시
+
+FinBridge는 금융사가 여러 외부 시스템과 통신할 때 사용하는 프로토콜들을 하나의 게이트웨이로 통합 관리하는 미들웨어다.
+
+### SOAP — 레거시 코어뱅킹 연동
+은행의 핵심 시스템(계좌조회, 이체처리 등)은 2000년대에 구축돼 대부분 SOAP 기반이다.
+예를 들어 핀테크 앱이 "A은행 잔액 조회"를 하면, A은행 코어뱅킹에 XML 메시지를 보내고 XML 응답을 받는다.
+금융결제원 공동망도 SOAP 방식이다.
+- **FinBridge 구현:** 앱 내부 `SoapEndpoint`에 `WebServiceTemplate`으로 XML 요청/응답
+
+### Kafka — 실시간 이상거래 탐지 (FDS)
+카드 결제가 발생하는 순간 거래 이벤트를 Kafka 토픽에 발행 → FDS(금융사기탐지시스템)가 구독해서
+수백ms 안에 이상 여부 판단. 이체 한도 초과, 새벽 해외 결제 등의 패턴을 실시간 감지한다.
+배치로 하면 이미 돈이 빠져나간 후라 Kafka를 쓴다.
+- **FinBridge 구현:** `KafkaTemplate.send()` → `integration-events` 토픽 발행 → `KafkaConsumerService` 소비
+
+### SFTP — 금감원 감독 보고
+금융사는 금감원에 정기적으로 보고 파일을 제출해야 한다.
+매일 밤 11시에 "오늘 전체 거래 내역 CSV" 또는 "분기 리스크 현황 파일"을 금감원 SFTP 서버에 올린다.
+실시간이 아닌 대용량 파일 전송이라 SFTP가 적합하다.
+- **FinBridge 구현:** JSch로 `atmoz/sftp` 컨테이너(port 2222)에 실제 SSH 연결 후 파일 업로드
+
+### Batch — 야간 정산 (EOD)
+은행 영업 마감 후 일괄 처리한다. 오늘 하루 발생한 이자 계산, 연체 고객 상태 변경,
+카드 청구서 생성 등이 새벽 2~4시에 Spring Batch Job으로 돌아간다.
+건별로 실시간 처리하면 부하가 너무 크기 때문이다.
+- **FinBridge 구현:** `JobLauncher.run()` → `integrationJob` (Reader → Processor → Writer) 실제 실행
+
+### REST — 오픈뱅킹 / 핀테크 연동
+금융결제원 오픈뱅킹 플랫폼이나 토스·카카오페이 같은 핀테크와 연동할 때 쓴다.
+예를 들어 토스가 "내 모든 은행 잔액 한눈에 보기"를 제공할 때, 각 은행의 오픈뱅킹 REST API를 호출한다.
+- **FinBridge 구현:** `WebClient`로 내부 `/internal/echo` 엔드포인트 호출 (외부 REST API 연동 구조 시연)
+
+---
+
 ## 1. 최종 패키지 구조
 
 ```
@@ -14,16 +49,19 @@ finbridge-portfolio/
 │   ├── FinbridgeApplication.java           # Spring Boot 진입점
 │   │
 │   ├── controller/
-│   │   └── IntegrationController.java      # REST API 엔드포인트
+│   │   ├── IntegrationController.java      # REST API 엔드포인트
+│   │   ├── HomeController.java             # Thymeleaf 대시보드 (2순위)
+│   │   └── InternalEchoController.java     # REST 어댑터 테스트용 내부 엔드포인트
 │   │
 │   ├── service/
 │   │   ├── IntegrationService.java         # 통합 오케스트레이션 (메인 로직)
 │   │   ├── adapter/
 │   │   │   ├── ProtocolAdapter.java        # 인터페이스
-│   │   │   ├── SoapAdapterService.java     # SOAP 구현
-│   │   │   ├── KafkaAdapterService.java    # Kafka 구현
-│   │   │   ├── SftpAdapterService.java     # SFTP 구현
-│   │   │   └── BatchAdapterService.java    # Batch 구현
+│   │   │   ├── SoapAdapterService.java     # SOAP 실제 구현 (WebServiceTemplate)
+│   │   │   ├── KafkaAdapterService.java    # Kafka 실제 구현 (KafkaTemplate)
+│   │   │   ├── SftpAdapterService.java     # SFTP 실제 구현 (JSch)
+│   │   │   ├── BatchAdapterService.java    # Batch 실제 구현 (JobLauncher)
+│   │   │   └── RestAdapterService.java     # REST 실제 구현 (WebClient)
 │   │   └── KafkaConsumerService.java       # Kafka 소비자 (비동기 처리)
 │   │
 │   ├── model/
@@ -45,13 +83,18 @@ finbridge-portfolio/
 │   │
 │   ├── config/
 │   │   ├── KafkaConfig.java                # Kafka 설정 (토픽 생성)
-│   │   └── WebConfig.java                  # Web 설정 (CORS, etc)
+│   │   ├── AppConfig.java                  # ObjectMapper Bean
+│   │   ├── WebConfig.java                  # CORS 설정
+│   │   ├── SoapConfig.java                 # WebServiceTemplate Bean
+│   │   └── BatchJobConfig.java             # Spring Batch Job/Step 정의
 │   │
-│   └── controller/
-│       └── HomeController.java             # Thymeleaf 대시보드 (2순위)
+│   └── soap/
+│       └── SoapEndpoint.java               # 내부 SOAP 엔드포인트 (@Endpoint)
 │
 ├── src/main/resources/
 │   ├── application.yml                     # Spring 설정
+│   ├── wsdl/
+│   │   └── integration.wsdl                # SOAP 계약 정의
 │   ├── db/migration/
 │   │   ├── V1__init.sql                    # 초기 스키마
 │   │   └── V2__add_indexes.sql             # 인덱스
@@ -67,13 +110,17 @@ finbridge-portfolio/
 │           └── AdapterTests.java           # 어댑터 단위 테스트
 │
 ├── build.gradle                            # 의존성 (✅ 기존)
-├── docker-compose.yml                      # MySQL + Kafka (✅ 기존)
+├── docker-compose.yml                      # MySQL + Kafka + SFTP
 └── ARCHITECTURE.md                         # 상세 설계 (✅ 기존)
 ```
 
 **주요 결정:**
-- `ProtocolAdapter` 인터페이스로 5개 어댑터 통일 (DRY)
-- `adapter/` 패키지로 어댑터 격리
+- `ProtocolAdapter` 인터페이스로 5개 어댑터 통일 (DRY) — **REST 추가로 5개**
+- 모든 어댑터 실제 구현 (mock 없음)
+  - SOAP: 앱 내부 `@Endpoint` + `WebServiceTemplate` 자기 자신 호출
+  - SFTP: docker-compose `atmoz/sftp` 컨테이너 + JSch 실제 업로드
+  - Batch: Spring Batch `JobLauncher` + Job/Step 실제 실행
+  - REST: `WebClient` + 내부 `/internal/echo` 엔드포인트 호출
 - Entity와 DTO 명확히 분리
 - HomeController는 2순위 (templates 제거 시에도 API만 동작)
 
@@ -487,59 +534,26 @@ public interface ProtocolAdapter {
 }
 ```
 
-#### `SoapAdapterService`
-```java
-@Service
-@Slf4j
-public class SoapAdapterService implements ProtocolAdapter {
-    
-    @Override
-    public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
-        long startTime = System.currentTimeMillis();
-        
-        try {
-            log.info("[SOAP] {} - 레거시 시스템 호출 시작", requestId);
-            
-            // 모의: 실제로는 Apache CXF로 SOAP 호출
-            Thread.sleep(100);  // 네트워크 지연 시뮬레이션
-            
-            log.info("[SOAP] {} - 성공", requestId);
-            
-            ProtocolResult result = new ProtocolResult();
-            result.setRequestId(requestId);
-            result.setProtocol(ProtocolType.SOAP);
-            result.setStatus(ResultStatus.SUCCESS);
-            result.setResponseCode("200");
-            result.setResponseMessage("레거시시스템 처리 완료");
-            result.setExecutionTimeMs(System.currentTimeMillis() - startTime);
-            protocolResultRepository.save(result);
-            
-            return toDTO(result);
-            
-        } catch (Exception e) {
-            log.error("[SOAP] {} - 실패: {}", requestId, e.getMessage());
-            
-            ProtocolResult result = new ProtocolResult();
-            result.setRequestId(requestId);
-            result.setProtocol(ProtocolType.SOAP);
-            result.setStatus(ResultStatus.FAILED);
-            result.setResponseCode("500");
-            result.setResponseMessage(e.getMessage());
-            result.setExecutionTimeMs(System.currentTimeMillis() - startTime);
-            protocolResultRepository.save(result);
-            
-            return toDTO(result);
-        }
-    }
-    
-    private ProtocolResultDTO toDTO(ProtocolResult result) {
-        return new ProtocolResultDTO(result.getStatus(), result.getResponseCode(),
-            result.getResponseMessage(), result.getExecutionTimeMs());
-    }
-}
-```
+#### `SoapAdapterService` — 실제 구현
+- 앱 내부 `SoapEndpoint` (`@Endpoint`)에 `WebServiceTemplate`으로 XML 요청/응답
+- `SoapConfig`에서 `WebServiceTemplate` Bean 등록
+- `integration.wsdl` 계약 기반 마샬링
 
-(KafkaAdapterService, SftpAdapterService, BatchAdapterService도 동일 패턴)
+#### `SftpAdapterService` — 실제 구현
+- JSch 라이브러리로 SSH 세션 연결
+- docker-compose의 `atmoz/sftp` 컨테이너(port 2222)에 파일 업로드
+- 업로드 경로: `/upload/finbridge-{requestId}.json`
+
+#### `BatchAdapterService` — 실제 구현
+- Spring Batch `JobLauncher.run(integrationJob, params)` 호출
+- `BatchJobConfig`에 Job/Step/ItemReader/ItemProcessor/ItemWriter 정의
+- payload를 읽어 처리 후 결과 반환
+
+#### `RestAdapterService` — 신규 실제 구현
+- `WebClient`로 앱 내부 `/internal/echo` 엔드포인트 호출
+- `InternalEchoController`가 payload를 그대로 반환 (실제 외부 REST API 연동 구조 시연)
+
+(KafkaAdapterService는 기존 실제 구현 유지 — KafkaTemplate.send())
 
 #### `KafkaConsumerService` (비동기 Kafka 소비자)
 ```java
@@ -747,13 +761,18 @@ git commit -m "docs: add README
   [ ] ProtocolResultRepository (with findByRequestId)
   [ ] SystemLogRepository (with findByProtocol, findByTimestampBetween)
 
-[ ] 5개 어댑터
+[ ] 어댑터 (전부 실제 구현)
   [ ] ProtocolAdapter (인터페이스)
-  [ ] SoapAdapterService (100ms 모의, auto-save)
-  [ ] KafkaAdapterService (producer)
-  [ ] KafkaConsumerService (@KafkaListener)
-  [ ] SftpAdapterService (500ms 모의, auto-save)
-  [ ] BatchAdapterService (50ms 모의, auto-save)
+  [ ] SoapAdapterService (WebServiceTemplate → 내부 SoapEndpoint 호출)
+  [ ] SoapEndpoint (@Endpoint, WSDL 기반)
+  [ ] SoapConfig (WebServiceTemplate Bean)
+  [ ] KafkaAdapterService (KafkaTemplate.send() — 기존 유지)
+  [ ] KafkaConsumerService (@KafkaListener — 기존 유지)
+  [ ] SftpAdapterService (JSch → atmoz/sftp 컨테이너 실제 업로드)
+  [ ] BatchAdapterService (JobLauncher → Spring Batch Job 실제 실행)
+  [ ] BatchJobConfig (Job/Step/Reader/Processor/Writer 정의)
+  [ ] RestAdapterService (WebClient → /internal/echo 호출)
+  [ ] InternalEchoController (/internal/echo 엔드포인트)
 
 [ ] IntegrationService
   [ ] processIntegration() - 병렬 실행, timeout, 상태 관리
@@ -815,10 +834,11 @@ git commit -m "docs: add README
 
 **1순위 완성 기준:**
 - ✅ REST API 게이트웨이 (POST /api/integrate, GET /status, GET /logs)
-- ✅ 5개 프로토콜 병렬 호출 (SOAP, Kafka, SFTP, Batch)
+- ✅ 5개 프로토콜 병렬 호출 (SOAP, Kafka, SFTP, Batch, REST)
+- ✅ 모든 어댑터 실제 구현 (mock 없음)
+- ✅ docker-compose: MySQL + Kafka(KRaft) + SFTP(atmoz/sftp)
 - ✅ request_id 추적 + DB 저장
 - ✅ 통합 E2E 테스트
-- ✅ 시간 내 완성 가능 (15시간 예상, 33시간 여유)
 
 **권장:** 이 계획대로 진행하면 **Day 1 끝에 1순위 100% 완성**, **Day 2에 2순위 완성 + 버그 픽스 가능**.
 
