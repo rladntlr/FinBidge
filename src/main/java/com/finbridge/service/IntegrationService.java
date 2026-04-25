@@ -60,6 +60,13 @@ public class IntegrationService {
     private final ExecutorService integrationTaskExecutor;
     private final TransactionTemplate transactionTemplate;
 
+    /**
+     * @Transactional: 요청 저장부터 완료 저장까지 하나의 트랜잭션으로 묶는다.
+     * 주의: 어댑터 실행(최대 35초) 동안 DB 커넥션을 점유하므로
+     * 고트래픽 환경에서는 커넥션 풀 고갈 가능성 있음.
+     * (프로토타입 수준에서는 허용)
+     */
+    @Transactional
     public IntegrationResponseDTO processIntegration(IntegrationRequestDTO request) {
         // [1] request_id 생성
         String requestId = UUID.randomUUID().toString();
