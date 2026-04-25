@@ -2,6 +2,7 @@ package com.finbridge.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finbridge.model.dto.AdapterExecutionConfig;
 import com.finbridge.model.dto.IntegrationRequestDTO;
 import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.LogResponseDTO;
@@ -78,24 +79,59 @@ public class IntegrationService {
         Map<String, ProtocolResultDTO> results = new HashMap<>();
 
         if (request.getProtocols().contains("SOAP")) {
-            scheduleIfEnabled(requestId, ProtocolType.SOAP, futures, results,
-                    () -> soapAdapterService.execute(requestId, request.getPayload()));
+            InterfaceConfig config = resolveEnabledConfig(requestId, ProtocolType.SOAP, results);
+            if (config != DISABLED_CONFIG) {
+                futures.put("SOAP", CompletableFuture.supplyAsync(
+                        () -> config == null
+                                ? soapAdapterService.execute(requestId, request.getPayload())
+                                : soapAdapterService.execute(requestId, request.getPayload(),
+                                        toAdapterConfig(ProtocolType.SOAP, config)),
+                        integrationTaskExecutor));
+            }
         }
         if (request.getProtocols().contains("KAFKA")) {
-            scheduleIfEnabled(requestId, ProtocolType.KAFKA, futures, results,
-                    () -> kafkaAdapterService.execute(requestId, request.getPayload()));
+            InterfaceConfig config = resolveEnabledConfig(requestId, ProtocolType.KAFKA, results);
+            if (config != DISABLED_CONFIG) {
+                futures.put("KAFKA", CompletableFuture.supplyAsync(
+                        () -> config == null
+                                ? kafkaAdapterService.execute(requestId, request.getPayload())
+                                : kafkaAdapterService.execute(requestId, request.getPayload(),
+                                        toAdapterConfig(ProtocolType.KAFKA, config)),
+                        integrationTaskExecutor));
+            }
         }
         if (request.getProtocols().contains("SFTP")) {
-            scheduleIfEnabled(requestId, ProtocolType.SFTP, futures, results,
-                    () -> sftpAdapterService.execute(requestId, request.getPayload()));
+            InterfaceConfig config = resolveEnabledConfig(requestId, ProtocolType.SFTP, results);
+            if (config != DISABLED_CONFIG) {
+                futures.put("SFTP", CompletableFuture.supplyAsync(
+                        () -> config == null
+                                ? sftpAdapterService.execute(requestId, request.getPayload())
+                                : sftpAdapterService.execute(requestId, request.getPayload(),
+                                        toAdapterConfig(ProtocolType.SFTP, config)),
+                        integrationTaskExecutor));
+            }
         }
         if (request.getProtocols().contains("BATCH")) {
-            scheduleIfEnabled(requestId, ProtocolType.BATCH, futures, results,
-                    () -> batchAdapterService.execute(requestId, request.getPayload()));
+            InterfaceConfig config = resolveEnabledConfig(requestId, ProtocolType.BATCH, results);
+            if (config != DISABLED_CONFIG) {
+                futures.put("BATCH", CompletableFuture.supplyAsync(
+                        () -> config == null
+                                ? batchAdapterService.execute(requestId, request.getPayload())
+                                : batchAdapterService.execute(requestId, request.getPayload(),
+                                        toAdapterConfig(ProtocolType.BATCH, config)),
+                        integrationTaskExecutor));
+            }
         }
         if (request.getProtocols().contains("REST")) {
-            scheduleIfEnabled(requestId, ProtocolType.REST, futures, results,
-                    () -> restAdapterService.execute(requestId, request.getPayload()));
+            InterfaceConfig config = resolveEnabledConfig(requestId, ProtocolType.REST, results);
+            if (config != DISABLED_CONFIG) {
+                futures.put("REST", CompletableFuture.supplyAsync(
+                        () -> config == null
+                                ? restAdapterService.execute(requestId, request.getPayload())
+                                : restAdapterService.execute(requestId, request.getPayload(),
+                                        toAdapterConfig(ProtocolType.REST, config)),
+                        integrationTaskExecutor));
+            }
         }
 
         // [6] 전체 완료 대기 (35초 timeout)
@@ -264,15 +300,23 @@ public class IntegrationService {
         return new ProtocolResultDTO(ResultStatus.FAILED, "500", "프로토콜 결과 없음", 0L);
     }
 
-    private void scheduleIfEnabled(
+    private static final InterfaceConfig DISABLED_CONFIG = new InterfaceConfig();
+
+    private InterfaceConfig resolveEnabledConfig(
             String requestId,
             ProtocolType protocol,
-            Map<String, CompletableFuture<ProtocolResultDTO>> futures,
-            Map<String, ProtocolResultDTO> results,
-            java.util.function.Supplier<ProtocolResultDTO> task
+            Map<String, ProtocolResultDTO> results
     ) {
         String protocolName = protocol.name();
-        if (!isProtocolEnabled(protocol)) {
+        List<InterfaceConfig> configs = interfaceConfigRepository.findByProtocol(protocol);
+        if (configs == null || configs.isEmpty()) {
+            return null;
+        }
+
+        Optional<InterfaceConfig> enabledConfig = configs.stream()
+                .filter(config -> Boolean.TRUE.equals(config.getEnabled()))
+                .findFirst();
+        if (enabledConfig.isEmpty()) {
             log.info("[INTEGRATION] {} - {} 비활성화로 Adapter 실행 생략", requestId, protocolName);
             results.put(protocolName, new ProtocolResultDTO(
                     ResultStatus.FAILED,
@@ -280,18 +324,22 @@ public class IntegrationService {
                     "비활성화된 인터페이스입니다.",
                     0L
             ));
-            return;
+            return DISABLED_CONFIG;
         }
 
-        futures.put(protocolName, CompletableFuture.supplyAsync(task, integrationTaskExecutor));
+        return enabledConfig.get();
     }
 
-    private boolean isProtocolEnabled(ProtocolType protocol) {
-        List<InterfaceConfig> configs = interfaceConfigRepository.findByProtocol(protocol);
-        if (configs == null || configs.isEmpty()) {
-            return true;
+    private AdapterExecutionConfig toAdapterConfig(ProtocolType protocol, InterfaceConfig config) {
+        if (config == null) {
+            return new AdapterExecutionConfig(protocol, null, null, null);
         }
-        return configs.stream().anyMatch(config -> Boolean.TRUE.equals(config.getEnabled()));
+        return new AdapterExecutionConfig(
+                protocol,
+                config.getInterfaceName(),
+                config.getEndpoint(),
+                config.getTimeoutMs()
+        );
     }
 
     private List<String> resolveRetryProtocols(String originalRequestId, List<String> requestedProtocols) {
