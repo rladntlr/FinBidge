@@ -1,253 +1,223 @@
-# 포트폴리오 프로젝트: 금융 IT 인터페이스 통합관리 시스템
+# FinBridge 기획서
 
-**작성일:** 2026-04-24  
-**상태:** DRAFT  
-**모드:** 포트폴리오 
-**제출 마감:** 2026-04-27 자정 
-
----
-
-## 1. 프로젝트 개요
-
-### 문제 정의
-금융사는 여러 프로토콜(REST, SOAP, MQ, Batch, SFTP)을 사용해 다양한 외부 시스템과 통신해야 한다. 각 프로토콜마다 별도의 연결/처리 로직을 구현하면:
-- 코드 중복 증가
-- 통합 지점 관리 어려움
-- 모니터링과 로깅이 산재됨
-
-**이 프로젝트의 목표:** 5개 프로토콜을 하나의 통합 플랫폼에서 관리하고, 단일 API로 요청/응답을 처리하는 시스템을 만든다.
-
-### 핵심 기능
-- **REST API 인터페이스** → 클라이언트 요청 진입점
-- **SOAP 어댑터** → 레거시 시스템 연결 
-- **MQ 처리** → 비동기 메시지 큐 
-- **Batch 작업** → 정시 작업 (Spring Batch)
-- **SFTP 파일 전송** → 파일 업로드/다운로드 
-- **통합 대시보드** → 각 프로토콜 상태, 로그, 성능 모니터링
+**프로젝트명:** FinBridge  
+**한 줄 소개:** 금융권에서 함께 운영되는 SOAP, Kafka, SFTP, Batch, REST 인터페이스를 하나의 요청 흐름으로 실행하고 추적하는 통합관리 시스템  
+**문서 목적:** 포트폴리오 제출 시 프로젝트의 문제 정의, 기획 의도, 설계 배경을 설명하기 위한 기획 문서  
+**작성 기준:** 현재 구현된 FinBridge 완성본 기준
 
 ---
 
-## 2. 아키텍처 전략
+## 1. 기획 배경
 
-### 핵심 설계 원칙
+금융 IT 시스템은 하나의 방식으로만 외부 시스템과 연결되지 않는다. 오래된 레거시 시스템은 SOAP을 사용하고, 실시간 이벤트는 Kafka 같은 메시징 시스템을 거치며, 기관 간 파일 연계는 SFTP로 처리된다. 정산, 마감, 일괄 처리 업무는 Batch로 실행되고, 비교적 최근에 만들어진 서비스는 REST API로 연결된다.
 
-```
-┌─────────────────────────────────────────────────────┐
-│         REST API Gateway (Spring Boot)              │
-│  (모든 요청의 진입점, 라우팅, 인증)                 │
-└──────────┬──────────────────────────────────────────┘
-           │
-    ┌──────┴────────┬─────────┬─────────┬──────────┐
-    │               │         │         │          │
-┌───▼──┐      ┌────▼──┐  ┌──▼──┐  ┌───▼──┐  ┌───▼──┐
-│SOAP  │      │SFTP   │  │ MQ  │  │Batch │  │ Log  │
-│모의  │      │모의   │  │실제 │  │ 모의  │  │      │
-└──────┘      └───────┘  └─────┘  └──────┘  └──────┘
-```
+문제는 이 연결 방식들이 모두 따로 관리되기 쉽다는 점이다.
 
-### 각 프로토콜의 구현 전략
+프로토콜별 구현이 흩어지면 운영자는 특정 요청이 어디까지 처리됐는지 한눈에 보기 어렵다. 개발자는 장애가 발생했을 때 SOAP 호출 문제인지, Kafka 발행 문제인지, SFTP 업로드 문제인지, Batch 실행 문제인지 각각의 로그와 결과를 따로 확인해야 한다. 시스템 연계 담당자는 하나의 업무 요청이 여러 연계 채널에 걸쳐 처리되는 상황에서 전체 성공 여부를 빠르게 판단하기 어렵다.
 
-| 프로토콜 | 구현 방식 | 목적 |
-|---------|---------|------|
-| **REST API** | 실제 구현 | 메인 인터페이스, CRUD |
-| **SOAP** | 실제 구현 (Apache CXF) | 레거시 시스템 연동 |
-| **MQ** | 실제 구현 (Kafka) | 비동기 메시지 처리 |
-| **Batch** | 실제 구현 (Spring Batch) | 정시 작업 스케줄링 |
-| **SFTP** | 실제 구현 (JSch) | 파일 전송 |
-
-**핵심 아이디어:** 
-- 5개 프로토콜 모두 실제 구현 (완전한 통합 시스템)
-- 바이브 코딩으로 빠른 개발 가능
-- 결과: 프로덕션 수준의 포트폴리오
+FinBridge는 이 문제를 포트폴리오 프로젝트 범위 안에서 재현하고, 하나의 API와 하나의 추적 모델로 해결하는 것을 목표로 했다.
 
 ---
 
-## 3. 구현 계획
+## 2. 해결하고자 한 문제
 
-### Phase 1: 프로젝트 구조 (2시간)
-```
-finbridge-portfolio/
-├── pom.xml                          # Maven 의존성
-├── src/main/java/com/finbridge/
-│   ├── controller/                  # REST API 엔드포인트
-│   │   └── IntegrationController.java
-│   ├── service/                     # 비즈니스 로직
-│   │   ├── SoapAdapterService.java  # SOAP 모의
-│   │   ├── MqService.java           # MQ 실제 구현
-│   │   ├── SftpAdapterService.java  # SFTP 모의
-│   │   └── BatchService.java        # Batch 모의
-│   ├── model/                       # DTO, Entity
-│   │   ├── IntegrationRequest.java
-│   │   └── IntegrationResponse.java
-│   ├── config/                      # 설정
-│   │   ├── RabbitMqConfig.java      # MQ 설정
-│   │   └── WebConfig.java
-│   └── Application.java             # Spring Boot 메인
-├── src/test/java/                   # 통합 테스트
-└── README.md
-```
+FinBridge가 다루는 핵심 문제는 "다중 인터페이스 연계의 분산된 실행과 추적"이다.
 
-### Phase 2: REST API 기본 구조 (4시간)
-- Spring Boot 프로젝트 초기화
-- IntegrationController 구현
-  - `POST /api/integrate` → 통합 요청
-  - `GET /api/status` → 프로토콜 상태 조회
-  - `GET /api/logs` → 처리 로그 조회
-- 요청/응답 모델 정의
-- 기본 에러 핸들링
+금융 시스템에서는 하나의 업무 요청이 여러 외부 시스템으로 동시에 전달될 수 있다. 예를 들어 고객 거래 데이터가 레거시 시스템에는 SOAP으로 전달되고, 이벤트 시스템에는 Kafka로 발행되며, 파일 기반 기관 연계에는 SFTP로 업로드되고, 내부 정산 프로세스는 Batch로 실행될 수 있다.
 
-### Phase 3: Kafka 통합 (6시간)
-- Kafka 로컬 구성 (Docker)
-- KafkaConfig 작성
-- 메시지 publish/subscribe 구현
-- 데드레터 토픽 처리
-- 통합 테스트
+이때 필요한 것은 단순히 각 프로토콜을 호출하는 코드가 아니다.
 
-### Phase 4: SOAP/SFTP/Batch 실제 구현 (10시간)
+- 요청 단위의 고유 ID
+- 요청한 프로토콜 목록
+- 프로토콜별 성공, 실패, 타임아웃 결과
+- 전체 요청의 최종 상태
+- 운영자가 조회할 수 있는 로그
+- 로컬에서 재현 가능한 실행 환경
 
-**SOAP (Apache CXF):**
-```java
-// SoapAdapterService.java
-@Service
-public class SoapAdapterService {
-    // Apache CXF로 SOAP 엔드포인트 호출
-    public SoapResponse callLegacySystem(String payload) {
-        // 실제 SOAP 통신
-    }
-}
-```
-
-**Kafka 실제:**
-```java
-// KafkaService.java
-@Service
-public class KafkaService {
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-    
-    public void sendMessage(String topic, String message) {
-        kafkaTemplate.send(topic, message);
-    }
-}
-```
-
-**SFTP (JSch):**
-```java
-// SftpAdapterService.java
-@Service
-public class SftpAdapterService {
-    // JSch로 SFTP 서버 연동
-    public boolean uploadFile(String host, String filename, byte[] data) {
-        // 실제 SFTP 파일 전송
-    }
-}
-```
-
-**Spring Batch:**
-```java
-// BatchJobConfig.java
-@Configuration
-public class BatchJobConfig {
-    // Spring Batch Job 구현
-    // 정시 작업 스케줄링
-}
-```
-
-### Phase 5: 통합 테스트 (4시간)
-- 시나리오: "요청 1개 → 5개 프로토콜 모두 호출 → 응답 반환"
-- MockMvc로 REST API 테스트
-- 각 프로토콜이 호출되었는지 검증
-
-### Phase 6: 대시보드 UI + 문서 (6시간)
-- **간단한 웹 UI** (Thymeleaf/HTML)
-  - 요청 폼 (5개 프로토콜 선택 가능)
-  - 응답 결과 표시
-  - 로그 조회
-  - 프로토콜별 상태 표시
-- README.md 작성 (실행 방법, 아키텍처 설명)
-- API 문서 (Swagger/Springdoc 자동 생성)
+FinBridge는 이 요소들을 하나의 흐름으로 묶어, "다양한 금융 연계 인터페이스를 중앙에서 실행하고 추적하는 시스템"을 구현했다.
 
 ---
 
-## 4. 기술 스택
+## 3. 핵심 사용자
 
-| 레이어 | 선택 | 이유 |
-|-------|------|------|
-| **프레임워크** | Spring Boot 3.x | 금융사 표준, 빠른 개발 |
-| **메시지 큐** | Kafka | 고성능, 이벤트 기반 아키텍처 |
-| **배치** | Spring Batch | Spring 생태계, 정시 작업 표준 |
-| **DB** | MySQL (Docker) | 금융사 표준, Flyway 마이그레이션 |
-| **DB 마이그레이션** | Flyway | 버전 관리, 자동 스키마 구성 |
-| **SOAP** | Apache CXF | 레거시 시스템 연동 표준 |
-| **SFTP** | JSch | 파일 전송 표준 라이브러리 |
-| **테스트** | JUnit 5 + Mockito | 표준 |
-| **빌드** | Gradle | 유연한 빌드 구성 |
-| **UI** | Thymeleaf + Bootstrap | 간단하고 빠름 |
+### 금융 IT 운영자
 
----
+운영자는 장애가 발생했을 때 가장 먼저 전체 상태를 확인해야 한다. FinBridge는 요청 ID 기준으로 전체 처리 결과와 프로토콜별 결과를 조회할 수 있게 하여, 어떤 연계 채널에서 문제가 났는지 빠르게 파악하도록 돕는다.
 
-## 5. 성공 기준
+### 백엔드 개발자
 
-✅ **반드시 완료**
-- [ ] REST API 동작 (최소 3개 엔드포인트)
-- [ ] 5개 프로토콜 모두 호출 가능 (모의/실제 혼합)
-- [ ] 통합 테스트 1개 이상 (end-to-end 흐름 증명)
-- [ ] 웹 UI에서 실제로 동작 확인 가능
-- [ ] README + 개발 문서 완성
+개발자는 여러 프로토콜의 호출 방식과 실패 처리를 한 서비스 안에서 일관되게 다뤄야 한다. FinBridge는 각 프로토콜을 어댑터로 분리하고, 최종 결과 저장과 상태 판단은 `IntegrationService`에서 중앙화해 유지보수 지점을 명확히 했다.
 
-✅ **있으면 좋은 것**
-- [ ] Swagger API 문서
-- [ ] 에러 처리 상세 구현
-- [ ] 로깅 구조화 (JSON)
-- [ ] Docker Compose (RabbitMQ 포함)
+### 시스템 연계 담당자
+
+연계 담당자는 외부 기관, 레거시 시스템, 파일 송수신, 이벤트 발행이 하나의 업무 흐름에서 어떻게 연결되는지 설명할 수 있어야 한다. FinBridge는 Docker 기반 로컬 실행과 웹 콘솔을 제공해 실제 흐름을 눈으로 확인할 수 있게 했다.
 
 ---
 
-## 6. 면접에서의 설명 포인트
+## 4. 핵심 기능
 
-**"왜 모의를 썼나?"**
-→ "48시간 안에 5개 프로토콜을 모두 보여주려면, 핵심 능력(통합 아키텍처)과 필수 구현(REST, MQ)에 집중했습니다. 모의는 금융업계의 표준 테스트 패턴입니다."
+### 4.1 다중 프로토콜 병렬 실행
 
-**"프로덕션으로 만들려면?"**
-→ "SOAP → Apache CXF 라이브러리, SFTP → JSch 라이브러리, Batch → 실제 DB 연결. 구조는 그대로입니다."
+`POST /api/integrate` 요청을 받으면 사용자가 선택한 SOAP, Kafka, SFTP, Batch, REST 프로토콜을 병렬로 실행한다. 각 프로토콜은 독립 어댑터로 분리되어 있으며, 전체 요청은 하나의 `requestId`로 추적된다.
 
-**"가장 어려웠던 부분?"**
-→ "5개 프로토콜을 하나의 요청 흐름에 통합하면서 각각의 에러를 처리하는 부분. 각 어댑터는 독립적이지만, 전체 흐름은 원자성(atomicity)을 유지해야 했습니다."
+### 4.2 통합 결과 반환
 
----
+각 프로토콜의 처리 결과를 `results`에 모아 반환한다. 전체 결과는 다음 세 가지 상태로 정리된다.
 
-## 7. 제출 구성
+- `ALL_SUCCESS`: 요청한 모든 프로토콜 성공
+- `PARTIAL_FAILURE`: 일부 성공, 일부 실패 또는 타임아웃
+- `ALL_FAILED`: 모든 프로토콜 실패
 
-```
-finbridge-portfolio/
-├── README.md                    (실행 방법, 아키텍처)
-├── ARCHITECTURE.md              (이 문서)
-├── pom.xml + 소스코드
-├── docker-compose.yml           (RabbitMQ 포함)
-└── 스크린샷 (UI 동작 확인)
-```
+응답에는 요청 생성 시각인 `createdAt`과 전체 처리 완료 시각인 `completedAt`을 함께 제공한다.
 
----
+### 4.3 요청 상태 조회
 
-## 다음 단계
+`GET /api/integrate/{requestId}`로 이전 요청의 처리 결과를 다시 조회할 수 있다. API 호출 직후 화면에서 확인하거나, 운영자가 특정 요청 ID를 기준으로 추적할 때 사용할 수 있다.
 
-1. **지금 (4/24 오후):** 아키텍처 문서 검토 + 프로젝트 구조 생성
-2. **오늘 밤:** REST API + Kafka 구현 완료
-3. **내일 오전:** SOAP(CXF) + SFTP(JSch) 실제 구현
-4. **내일 정오:** Spring Batch + 통합 테스트
-5. **내일 오후:** UI 완성 + 문서 정리
-6. **내일 저녁:** 최종 검수 + 제출 준비
+### 4.4 시스템 로그 조회
 
-**타임라인: 36-40시간 (여유 8-12시간)**
+`GET /api/logs`는 요청 시작, 프로토콜별 처리 결과, 최종 완료 이벤트를 조회한다. 프로토콜 필터와 페이지네이션을 지원해 운영자가 필요한 로그만 확인할 수 있다.
+
+### 4.5 Docker 기반 로컬 검증
+
+MySQL, Kafka, SFTP를 Docker Compose로 실행한다. Flyway는 도메인 테이블과 Spring Batch 메타데이터 테이블을 생성한다. Docker E2E 테스트는 실제 MySQL, Kafka, SFTP, Batch 경로를 사용해 로컬에서도 실제 연계 흐름을 검증할 수 있게 한다.
+
+### 4.6 웹 콘솔
+
+정적 HTML 기반 웹 콘솔을 제공한다. 프로토콜 선택, 샘플 요청 실행, 결과 확인, 로그 조회를 브라우저에서 확인할 수 있다. 이 화면은 운영 대시보드의 완성형이라기보다, 포트폴리오 제출과 로컬 데모를 위한 기능 확인용 콘솔이다.
 
 ---
 
-## 열린 질문
+## 5. 사용자 시나리오
 
-- [ ] RabbitMQ를 Docker로 실행할까, 로컬 설치할까? → Docker Compose 추천
-- [ ] UI를 React로 할까, Thymeleaf로 할까? → Thymeleaf (빠름)
-- [ ] DB가 필요할까? → H2 인메모리로 충분
-- [ ] SOAP 모의는 실제 WSDL을 쓸까? → Mock 클래스로 충분
+### 시나리오 1. 전체 프로토콜 연계 확인
+
+1. 사용자가 웹 콘솔 또는 API 클라이언트에서 SOAP, Kafka, SFTP, Batch, REST를 모두 선택한다.
+2. `POST /api/integrate` 요청을 보낸다.
+3. FinBridge가 5개 어댑터를 병렬로 실행한다.
+4. 사용자는 `requestId`, 전체 상태, 프로토콜별 결과를 즉시 확인한다.
+5. 필요하면 `GET /api/logs`에서 처리 로그를 확인한다.
+
+### 시나리오 2. 특정 프로토콜만 검증
+
+1. 개발자가 SFTP만 선택해 요청한다.
+2. FinBridge는 SFTP 어댑터만 실행한다.
+3. SFTP 컨테이너의 `/upload` 경로에 파일이 생성된다.
+4. 개발자는 API 응답과 컨테이너 파일을 함께 확인해 연계 경로를 검증한다.
+
+### 시나리오 3. 운영자가 요청 ID로 장애 지점 추적
+
+1. 운영자가 실패한 요청의 `requestId`를 전달받는다.
+2. `GET /api/integrate/{requestId}`로 전체 결과를 조회한다.
+3. 실패한 프로토콜과 응답 메시지를 확인한다.
+4. `GET /api/logs?protocol=...`로 해당 프로토콜 로그를 좁혀 본다.
 
 ---
 
+## 6. MVP 범위
+
+현재 FinBridge의 MVP는 "로컬에서 실제로 실행 가능한 다중 프로토콜 통합관리 시스템"이다.
+
+구현된 범위:
+
+- `POST /api/integrate` 통합 요청 API
+- `GET /api/integrate/{requestId}` 상태 조회 API
+- `GET /api/logs` 시스템 로그 조회 API
+- SOAP, Kafka, SFTP, Batch, REST 어댑터
+- MySQL 기반 요청, 결과, 로그 저장
+- Flyway 기반 스키마 관리
+- Spring Batch 메타데이터 테이블 구성
+- Kafka DLT 흐름 구성
+- SFTP host key 고정 및 `StrictHostKeyChecking=yes`
+- Docker Compose 실행 환경
+- 단위 테스트, H2 기반 통합 테스트, Docker E2E 테스트
+- 기능 확인용 웹 콘솔
+
+MVP에서 제외한 범위:
+
+- 사용자 인증과 권한 관리
+- 운영용 대시보드 차트
+- 실패 건 재처리 API
+- Slack, Email 등 알림 연동
+- 실제 외부 금융기관 시스템 연동
+- 운영 배포 환경 구성
+
+---
+
+## 7. 기대 효과
+
+### 운영 관점
+
+프로토콜별 결과와 전체 상태를 같은 요청 ID로 추적할 수 있다. 장애 발생 시 어떤 연계 채널이 실패했는지 빠르게 확인할 수 있다.
+
+### 개발 관점
+
+어댑터별 책임과 통합 서비스의 책임이 분리된다. 새 프로토콜을 추가하더라도 기존 흐름을 크게 바꾸지 않고 어댑터와 결과 매핑을 확장할 수 있다.
+
+### 검증 관점
+
+단순 Mock 데모가 아니라 Docker 기반으로 MySQL, Kafka, SFTP, Batch 실행까지 확인할 수 있다. 포트폴리오 평가자가 로컬에서 직접 실행해 기능을 검증할 수 있다.
+
+---
+
+## 8. 프로젝트 차별점
+
+### 8.1 여러 기술을 나열하는 데서 끝나지 않음
+
+FinBridge는 SOAP, Kafka, SFTP, Batch, REST를 각각 따로 보여주는 프로젝트가 아니다. 하나의 요청이 여러 프로토콜을 병렬로 실행하고, 하나의 응답과 로그 모델로 모이는 흐름을 구현했다.
+
+### 8.2 금융권 연계 업무의 현실성을 반영
+
+금융권 시스템은 새로운 REST API만으로 구성되지 않는다. 레거시 SOAP, 파일 기반 SFTP, 이벤트 기반 Kafka, 일괄 처리 Batch가 함께 존재한다. FinBridge는 이 혼합 환경을 의도적으로 다룬다.
+
+### 8.3 로컬 재현성을 중요하게 설계
+
+Docker Compose로 MySQL, Kafka, SFTP를 실행하고, Flyway로 스키마를 관리한다. SFTP host key도 고정해 매번 known_hosts 충돌을 해결해야 하는 문제를 줄였다.
+
+### 8.4 리뷰와 테스트를 거쳐 안정성 이슈를 정리
+
+Batch 메타데이터 테이블, Kafka advertised listener, SFTP host key, 로그 페이지네이션, 프로토콜 검증, timeout 이후 late result 저장 문제 등 런타임에서 터질 수 있는 항목을 리뷰와 테스트를 통해 정리했다.
+
+---
+
+## 9. 향후 확장 방향
+
+### 인증과 권한
+
+현재 API는 로컬 데모 기준으로 열려 있다. 운영 환경에서는 사용자 인증, 관리자 권한, 요청자별 조회 범위 제한이 필요하다.
+
+### 운영 대시보드
+
+현재 웹 콘솔은 기능 확인용이다. 운영 대시보드로 확장하려면 프로토콜별 성공률, 평균 응답 시간, 실패 추이, 최근 장애 현황을 시각화할 수 있다.
+
+### 알림
+
+특정 프로토콜 실패, 전체 실패, timeout 발생 시 Slack, Email, SMS 등으로 알림을 보낼 수 있다.
+
+### 재처리
+
+현재는 요청 실행과 조회에 집중한다. 향후에는 실패한 프로토콜만 재처리하는 API를 추가할 수 있다.
+
+### 실제 외부 기관 연계
+
+현재 REST와 SOAP은 프로젝트 내부의 legacy service를 호출하는 구조다. 운영 확장 시에는 외부 endpoint 설정, 인증서, 네트워크 보안, 기관별 전문 변환 규칙이 필요하다.
+
+---
+
+## 10. 제출 시 설명 포인트
+
+### 왜 이 프로젝트를 만들었는가
+
+금융 IT에서는 여러 인터페이스가 동시에 존재하고, 각 연계 상태를 한 곳에서 추적하는 일이 중요하다. FinBridge는 이 상황을 작은 범위로 재현한 통합관리 시스템이다.
+
+### 무엇을 중점적으로 구현했는가
+
+단순 CRUD가 아니라 다중 프로토콜 병렬 실행, 결과 통합, 로그 추적, Docker 기반 실제 검증에 집중했다.
+
+### 어디까지가 현재 구현이고 어디부터가 확장인가
+
+현재 구현은 로컬에서 실행 가능한 MVP다. 인증, 운영 대시보드, 알림, 재처리, 실제 기관 연계는 향후 확장 범위로 명확히 분리했다.
+
+### 기술적으로 어떤 점을 보여줄 수 있는가
+
+Spring Boot 기반 API 설계, JPA/Flyway 스키마 관리, Kafka 메시징, SFTP 파일 전송, Spring Batch 실행, SOAP/REST 어댑터 구조, CompletableFuture 병렬 처리, Docker E2E 테스트를 하나의 프로젝트 안에서 설명할 수 있다.
