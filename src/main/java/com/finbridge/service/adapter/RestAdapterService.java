@@ -1,14 +1,11 @@
 package com.finbridge.service.adapter;
 
 import com.finbridge.model.dto.ProtocolResultDTO;
-import com.finbridge.model.entity.ProtocolResult;
-import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
-import com.finbridge.repository.ProtocolResultRepository;
+import com.finbridge.service.legacy.LegacyRestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
 
@@ -17,48 +14,27 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RestAdapterService implements ProtocolAdapter {
 
-    private final ProtocolResultRepository protocolResultRepository;
-    private final WebClient.Builder webClientBuilder;
+    private final LegacyRestService legacyRestService;
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
         long startTime = System.currentTimeMillis();
-        log.info("[REST] {} - 외부 REST 시스템 호출 시작", requestId);
+        log.info("[REST] {} - REST 레거시 처리 시작", requestId);
 
         try {
-            Map<?, ?> response = webClientBuilder.build()
-                    .post()
-                    .uri("http://localhost:8080/internal/echo")
-                    .bodyValue(payload)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
+            Map<String, Object> response = legacyRestService.echo(payload);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
             String message = response != null ? (String) response.get("message") : "응답 없음";
 
             log.info("[REST] {} - 성공 ({}ms): {}", requestId, executionTimeMs, message);
-            saveResult(requestId, ResultStatus.SUCCESS, "200", message, executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200", message, executionTimeMs);
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[REST] {} - 실패: {}", requestId, e.getMessage());
 
-            saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
         }
-    }
-
-    private void saveResult(String requestId, ResultStatus status,
-                            String code, String message, Long executionTimeMs) {
-        ProtocolResult result = new ProtocolResult();
-        result.setRequestId(requestId);
-        result.setProtocol(ProtocolType.REST);
-        result.setStatus(status);
-        result.setResponseCode(code);
-        result.setResponseMessage(message);
-        result.setExecutionTimeMs(executionTimeMs);
-        protocolResultRepository.save(result);
     }
 }

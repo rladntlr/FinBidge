@@ -3,7 +3,7 @@ spring:
     name: FinBridge
 
   datasource:
-    url: jdbc:mysql://localhost:3306/finbridge?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    url: jdbc:mysql://localhost:3307/finbridge?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -44,6 +44,8 @@ sftp:
   username: finbridge
   password: finbridge123
   upload-dir: /upload
+  strict-host-key-checking: "yes"
+  known-hosts: ${user.home}/.ssh/known_hosts
 
 server:
   port: 8080

@@ -2,16 +2,13 @@ package com.finbridge.service.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.ProtocolResultDTO;
-import com.finbridge.model.entity.ProtocolResult;
-import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
-import com.finbridge.repository.ProtocolResultRepository;
+import com.finbridge.service.legacy.LegacySoapService;
 import com.finbridge.soap.IntegrationSoapRequest;
 import com.finbridge.soap.IntegrationSoapResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.ws.client.core.WebServiceTemplate;
 
 import java.util.Map;
 
@@ -20,9 +17,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SoapAdapterService implements ProtocolAdapter {
 
-    private final ProtocolResultRepository protocolResultRepository;
-    private final WebServiceTemplate webServiceTemplate;
     private final ObjectMapper objectMapper;
+    private final LegacySoapService legacySoapService;
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
@@ -34,33 +30,18 @@ public class SoapAdapterService implements ProtocolAdapter {
             request.setRequestId(requestId);
             request.setPayload(objectMapper.writeValueAsString(payload));
 
-            IntegrationSoapResponse response = (IntegrationSoapResponse)
-                    webServiceTemplate.marshalSendAndReceive(request);
+            IntegrationSoapResponse response = legacySoapService.process(request);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.info("[SOAP] {} - 성공 ({}ms): {}", requestId, executionTimeMs, response.getMessage());
 
-            saveResult(requestId, ResultStatus.SUCCESS, "200", response.getMessage(), executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200", response.getMessage(), executionTimeMs);
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.error("[SOAP] {} - 실패: {}", requestId, e.getMessage());
 
-            saveResult(requestId, ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
             return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
         }
-    }
-
-    private void saveResult(String requestId, ResultStatus status,
-                            String code, String message, Long executionTimeMs) {
-        ProtocolResult result = new ProtocolResult();
-        result.setRequestId(requestId);
-        result.setProtocol(ProtocolType.SOAP);
-        result.setStatus(status);
-        result.setResponseCode(code);
-        result.setResponseMessage(message);
-        result.setExecutionTimeMs(executionTimeMs);
-        protocolResultRepository.save(result);
     }
 }

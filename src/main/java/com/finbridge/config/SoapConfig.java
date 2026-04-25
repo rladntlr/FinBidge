@@ -1,5 +1,7 @@
 package com.finbridge.config;
 
+import com.finbridge.soap.IntegrationSoapRequest;
+import com.finbridge.soap.IntegrationSoapResponse;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -11,7 +13,6 @@ import org.springframework.ws.transport.http.MessageDispatcherServlet;
 import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
 import org.springframework.xml.xsd.SimpleXsdSchema;
 import org.springframework.xml.xsd.XsdSchema;
-import org.springframework.ws.client.core.WebServiceTemplate;
 
 @EnableWs
 @Configuration
@@ -43,16 +44,7 @@ public class SoapConfig {
     @Bean
     public Jaxb2Marshaller jaxb2Marshaller() {
         Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-        marshaller.setContextPath("com.finbridge.soap");
+        marshaller.setClassesToBeBound(IntegrationSoapRequest.class, IntegrationSoapResponse.class);
         return marshaller;
-    }
-
-    @Bean
-    public WebServiceTemplate webServiceTemplate(Jaxb2Marshaller marshaller) {
-        WebServiceTemplate template = new WebServiceTemplate();
-        template.setMarshaller(marshaller);
-        template.setUnmarshaller(marshaller);
-        template.setDefaultUri("http://localhost:8080/ws");
-        return template;
     }
 }

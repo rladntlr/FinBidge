@@ -9,6 +9,7 @@ import com.finbridge.model.entity.ProtocolResult;
 import com.finbridge.model.entity.SystemLog;
 import com.finbridge.model.enums.EventType;
 import com.finbridge.model.enums.OverallStatus;
+import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.RequestStatus;
 import com.finbridge.model.enums.ResultStatus;
 import com.finbridge.repository.IntegrationRequestRepository;
@@ -27,9 +28,11 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -46,6 +49,7 @@ public class IntegrationService {
     private final BatchAdapterService batchAdapterService;
     private final RestAdapterService restAdapterService;
     private final ObjectMapper objectMapper;
+    private final ExecutorService integrationTaskExecutor;
 
     public IntegrationResponseDTO processIntegration(IntegrationRequestDTO request) {
         // [1] request_id 생성
@@ -77,23 +81,23 @@ public class IntegrationService {
 
         if (request.getProtocols().contains("SOAP")) {
             futures.put("SOAP", CompletableFuture.supplyAsync(
-                    () -> soapAdapterService.execute(requestId, request.getPayload())));
+                    () -> soapAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("KAFKA")) {
             futures.put("KAFKA", CompletableFuture.supplyAsync(
-                    () -> kafkaAdapterService.execute(requestId, request.getPayload())));
+                    () -> kafkaAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("SFTP")) {
             futures.put("SFTP", CompletableFuture.supplyAsync(
-                    () -> sftpAdapterService.execute(requestId, request.getPayload())));
+                    () -> sftpAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("BATCH")) {
             futures.put("BATCH", CompletableFuture.supplyAsync(
-                    () -> batchAdapterService.execute(requestId, request.getPayload())));
+                    () -> batchAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("REST")) {
             futures.put("REST", CompletableFuture.supplyAsync(
-                    () -> restAdapterService.execute(requestId, request.getPayload())));
+                    () -> restAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
 
         // [6] 전체 완료 대기 (35초 timeout)
@@ -105,7 +109,7 @@ public class IntegrationService {
                     .join();
 
             for (var entry : futures.entrySet()) {
-                results.put(entry.getKey(), entry.getValue().getNow(null));
+                results.put(entry.getKey(), normalizeResult(entry.getValue().getNow(null)));
             }
         } catch (CompletionException e) {
             log.warn("[INTEGRATION] {} - 일부 프로토콜 타임아웃 또는 실패", requestId);
@@ -115,7 +119,7 @@ public class IntegrationService {
                             ResultStatus.TIMEOUT, "504", "35초 내 응답 없음", 35000L));
                 } else {
                     try {
-                        results.put(entry.getKey(), entry.getValue().get());
+                        results.put(entry.getKey(), normalizeResult(entry.getValue().get()));
                     } catch (Exception ex) {
                         results.put(entry.getKey(), new ProtocolResultDTO(
                                 ResultStatus.FAILED, "500", ex.getMessage(), 0L));
@@ -123,6 +127,13 @@ public class IntegrationService {
                 }
             }
         }
+
+        results.forEach((protocol, result) -> {
+            ProtocolType protocolType = ProtocolType.valueOf(protocol);
+            saveProtocolResult(requestId, protocolType, result);
+            saveLog(requestId, protocolType, toEventType(result),
+                    protocol + " 처리 결과: " + result.getStatus());
+        });
 
         // [7-8] 전체 상태 판정
         OverallStatus overallStatus = determineOverallStatus(results);
@@ -143,13 +154,12 @@ public class IntegrationService {
         return new IntegrationResponseDTO(requestId, overallStatus, results, LocalDateTime.now());
     }
 
-    public IntegrationResponseDTO getStatus(String requestId) {
-        IntegrationRequest entity = integrationRequestRepository.findByRequestId(requestId)
-                .orElse(null);
-
-        if (entity == null) {
-            return null;
+    public Optional<IntegrationResponseDTO> getStatus(String requestId) {
+        Optional<IntegrationRequest> entityOptional = integrationRequestRepository.findByRequestId(requestId);
+        if (entityOptional.isEmpty()) {
+            return Optional.empty();
         }
+        IntegrationRequest entity = entityOptional.get();
 
         List<ProtocolResult> protocolResults = protocolResultRepository.findByRequestId(requestId);
         Map<String, ProtocolResultDTO> resultMap = new HashMap<>();
@@ -160,8 +170,8 @@ public class IntegrationService {
                     r.getResponseMessage(), r.getExecutionTimeMs()));
         }
 
-        return new IntegrationResponseDTO(
-                requestId, entity.getOverallStatus(), resultMap, entity.getCreatedAt());
+        return Optional.of(new IntegrationResponseDTO(
+                requestId, entity.getOverallStatus(), resultMap, entity.getCreatedAt()));
     }
 
     private OverallStatus determineOverallStatus(Map<String, ProtocolResultDTO> results) {
@@ -174,6 +184,28 @@ public class IntegrationService {
         if (successCount == results.size()) return OverallStatus.ALL_SUCCESS;
         if (successCount == 0) return OverallStatus.ALL_FAILED;
         return OverallStatus.PARTIAL_FAILURE;
+    }
+
+    private ProtocolResultDTO normalizeResult(ProtocolResultDTO result) {
+        if (result != null) {
+            return result;
+        }
+        return new ProtocolResultDTO(ResultStatus.FAILED, "500", "프로토콜 결과 없음", 0L);
+    }
+
+    private void saveProtocolResult(String requestId, ProtocolType protocol, ProtocolResultDTO dto) {
+        ProtocolResult result = new ProtocolResult();
+        result.setRequestId(requestId);
+        result.setProtocol(protocol);
+        result.setStatus(dto.getStatus());
+        result.setResponseCode(dto.getResponseCode());
+        result.setResponseMessage(dto.getResponseMessage());
+        result.setExecutionTimeMs(dto.getExecutionTimeMs());
+        protocolResultRepository.save(result);
+    }
+
+    private EventType toEventType(ProtocolResultDTO result) {
+        return result.getStatus() == ResultStatus.SUCCESS ? EventType.SUCCESS : EventType.FAILED;
     }
 
     private void saveLog(String requestId, com.finbridge.model.enums.ProtocolType protocol,

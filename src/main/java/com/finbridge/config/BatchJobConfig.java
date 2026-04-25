@@ -3,9 +3,8 @@ package com.finbridge.config;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.batch.core.launch.support.TaskExecutorJobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.ItemProcessor;
@@ -13,7 +12,6 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -26,6 +24,7 @@ public class BatchJobConfig {
     // requestId/payload 는 JobParameters 로 전달받아 로그에 기록
 
     @Bean
+    @StepScope
     public ItemReader<String> integrationItemReader() {
         AtomicBoolean read = new AtomicBoolean(false);
         return () -> {
@@ -71,12 +70,4 @@ public class BatchJobConfig {
                 .build();
     }
 
-    @Bean
-    public JobLauncher jobLauncher(JobRepository jobRepository) throws Exception {
-        TaskExecutorJobLauncher launcher = new TaskExecutorJobLauncher();
-        launcher.setJobRepository(jobRepository);
-        launcher.setTaskExecutor(new SyncTaskExecutor());
-        launcher.afterPropertiesSet();
-        return launcher;
-    }
 }
