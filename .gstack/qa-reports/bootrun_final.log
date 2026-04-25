@@ -1,0 +1,192 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :resolveMainClassName UP-TO-DATE
+
+> Task :bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.4)
+
+2026-04-25T20:26:55.131+09:00  INFO 23327 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : Starting FinbridgeApplication using Java 17.0.17 with PID 23327 (/Users/kim/Desktop/uplus/FinBridge/build/classes/java/main started by kim in /Users/kim/Desktop/uplus/FinBridge)
+2026-04-25T20:26:55.132+09:00 DEBUG 23327 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : Running with Spring Boot v3.4.4, Spring v6.2.5
+2026-04-25T20:26:55.132+09:00  INFO 23327 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-04-25T20:26:55.421+09:00  INFO 23327 --- [FinBridge] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-04-25T20:26:55.445+09:00  INFO 23327 --- [FinBridge] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 20 ms. Found 3 JPA repository interfaces.
+2026-04-25T20:26:55.670+09:00  INFO 23327 --- [FinBridge] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-04-25T20:26:55.681+09:00  INFO 23327 --- [FinBridge] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-04-25T20:26:55.681+09:00  INFO 23327 --- [FinBridge] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.39]
+2026-04-25T20:26:55.712+09:00  INFO 23327 --- [FinBridge] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-04-25T20:26:55.713+09:00  INFO 23327 --- [FinBridge] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 561 ms
+2026-04-25T20:26:55.811+09:00  INFO 23327 --- [FinBridge] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-04-25T20:26:55.894+09:00  INFO 23327 --- [FinBridge] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@10b8b900
+2026-04-25T20:26:55.894+09:00  INFO 23327 --- [FinBridge] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-04-25T20:26:55.922+09:00  INFO 23327 --- [FinBridge] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3307/finbridge?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul (MySQL 8.0)
+2026-04-25T20:26:55.956+09:00  INFO 23327 --- [FinBridge] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 3 migrations (execution time 00:00.016s)
+2026-04-25T20:26:55.966+09:00  INFO 23327 --- [FinBridge] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `finbridge`: 3
+2026-04-25T20:26:55.968+09:00  INFO 23327 --- [FinBridge] [           main] o.f.core.internal.command.DbMigrate      : Schema `finbridge` is up to date. No migration necessary.
+2026-04-25T20:26:56.017+09:00  INFO 23327 --- [FinBridge] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-04-25T20:26:56.046+09:00  INFO 23327 --- [FinBridge] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.11.Final
+2026-04-25T20:26:56.063+09:00  INFO 23327 --- [FinBridge] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-04-25T20:26:56.176+09:00  INFO 23327 --- [FinBridge] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-04-25T20:26:56.214+09:00  INFO 23327 --- [FinBridge] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.0.46
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-04-25T20:26:56.552+09:00  INFO 23327 --- [FinBridge] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-04-25T20:26:56.572+09:00  INFO 23327 --- [FinBridge] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-04-25T20:26:56.817+09:00  INFO 23327 --- [FinBridge] [           main] .w.s.a.s.AnnotationActionEndpointMapping : Supporting [WS-Addressing August 2004, WS-Addressing 1.0]
+2026-04-25T20:26:57.209+09:00  WARN 23327 --- [FinBridge] [nBridge-admin-0] o.a.k.clients.admin.KafkaAdminClient     : [AdminClient clientId=FinBridge-admin-0] The DescribeTopicPartitions API is not supported, using Metadata API to describe topics.
+2026-04-25T20:26:57.220+09:00  INFO 23327 --- [FinBridge] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-04-25T20:26:57.277+09:00  INFO 23327 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : Started FinbridgeApplication in 2.32 seconds (process running for 2.453)
+2026-04-25T20:27:12.131+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:27:12.145+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-25T20:27:13.984+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-04-25T20:27:13.984+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-04-25T20:27:13.987+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 3 ms
+2026-04-25T20:27:14.011+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-1] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=1, offset=0
+2026-04-25T20:27:33.378+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-2] c.f.controller.IntegrationController     : [API] POST /api/integrate - protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:27:33.378+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-2] c.finbridge.service.IntegrationService   : [INTEGRATION] 요청 시작: requestId=8b4905ae-8471-4603-8df3-1a2d0481f874, protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:27:33.476+09:00  INFO 23327 --- [FinBridge] [ation-adapter-1] c.f.service.adapter.SoapAdapterService   : [SOAP] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 레거시 시스템 호출 시작
+2026-04-25T20:27:33.476+09:00  INFO 23327 --- [FinBridge] [ation-adapter-2] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 메시지 발행 시작
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-1] c.f.service.legacy.LegacySoapService     : [SOAP Legacy] 요청 처리: requestId=8b4905ae-8471-4603-8df3-1a2d0481f874
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-3] c.f.service.adapter.SftpAdapterService   : [SFTP] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 파일 업로드 시작: finbridge-8b4905ae-8471-4603-8df3-1a2d0481f874.json
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-1] c.f.service.adapter.SoapAdapterService   : [SOAP] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 성공 (1ms): 레거시 시스템 처리 완료: 8b4905ae-8471-4603-8df3-1a2d0481f874
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] c.f.service.adapter.BatchAdapterService  : [BATCH] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 배치 작업 실행 시작
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-5] c.f.service.adapter.RestAdapterService   : [REST] 8b4905ae-8471-4603-8df3-1a2d0481f874 - REST 레거시 처리 시작
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-5] c.f.service.legacy.LegacyRestService     : [REST Legacy] 요청 처리: {amount=500, currency=KRW}
+2026-04-25T20:27:33.477+09:00  INFO 23327 --- [FinBridge] [ation-adapter-5] c.f.service.adapter.RestAdapterService   : [REST] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 성공 (0ms): REST 외부 시스템 처리 완료
+2026-04-25T20:27:33.520+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] launched with the following parameters: [{'payload':'{value={"amount":500,"currency":"KRW"}, type=class java.lang.String, identifying=true}','requestId':'{value=8b4905ae-8471-4603-8df3-1a2d0481f874, type=class java.lang.String, identifying=true}','timestamp':'{value=1777116453478, type=class java.lang.Long, identifying=true}'}]
+2026-04-25T20:27:33.524+09:00  INFO 23327 --- [FinBridge] [ation-adapter-2] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 발행 성공 (48ms)
+2026-04-25T20:27:33.526+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] 메시지 수신: 8b4905ae-8471-4603-8df3-1a2d0481f874|{"amount":500,"currency":"KRW"}
+2026-04-25T20:27:33.526+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] requestId=8b4905ae-8471-4603-8df3-1a2d0481f874 처리 완료
+2026-04-25T20:27:33.543+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.batch.core.job.SimpleStepHandler     : Executing step: [integrationStep]
+2026-04-25T20:27:33.558+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] com.finbridge.config.BatchJobConfig      : [BATCH Processor] 페이로드 처리 중: integration-payload
+2026-04-25T20:27:33.558+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] com.finbridge.config.BatchJobConfig      : [BATCH Writer] 처리 완료 항목 기록: processed-integration-payload
+2026-04-25T20:27:33.561+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.batch.core.step.AbstractStep         : Step: [integrationStep] executed in 17ms
+2026-04-25T20:27:33.573+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] completed with the following parameters: [{'payload':'{value={"amount":500,"currency":"KRW"}, type=class java.lang.String, identifying=true}','requestId':'{value=8b4905ae-8471-4603-8df3-1a2d0481f874, type=class java.lang.String, identifying=true}','timestamp':'{value=1777116453478, type=class java.lang.Long, identifying=true}'}] and the following status: [COMPLETED] in 43ms
+2026-04-25T20:27:33.573+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] c.f.service.adapter.BatchAdapterService  : [BATCH] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 완료 (96ms)
+2026-04-25T20:27:34.082+09:00  INFO 23327 --- [FinBridge] [ation-adapter-3] c.f.service.adapter.SftpAdapterService   : [SFTP] 8b4905ae-8471-4603-8df3-1a2d0481f874 - 업로드 성공: finbridge-8b4905ae-8471-4603-8df3-1a2d0481f874.json (605ms)
+2026-04-25T20:27:34.136+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-2] c.finbridge.service.IntegrationService   : [INTEGRATION] 8b4905ae-8471-4603-8df3-1a2d0481f874 완료: ALL_SUCCESS
+2026-04-25T20:27:34.262+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-6] c.f.controller.IntegrationController     : [API] GET /api/integrate/nonexistent
+2026-04-25T20:27:34.311+09:00  INFO 23327 --- [FinBridge] [io-8080-exec-10] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=5, offset=0
+2026-04-25T20:27:34.354+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-2] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=SOAP, limit=50, offset=0
+2026-04-25T20:27:34.367+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-4] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=0, offset=0
+2026-04-25T20:27:34.377+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-5] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=INVALID, limit=50, offset=0
+2026-04-25T20:27:46.791+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-6] c.f.controller.IntegrationController     : [API] POST /api/integrate - protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:27:46.793+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-6] c.finbridge.service.IntegrationService   : [INTEGRATION] 요청 시작: requestId=25ed2c12-56f3-4425-9bf0-60bd0ef17e8b, protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [ation-adapter-8] c.f.service.adapter.SftpAdapterService   : [SFTP] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 파일 업로드 시작: finbridge-25ed2c12-56f3-4425-9bf0-60bd0ef17e8b.json
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] c.f.service.adapter.BatchAdapterService  : [BATCH] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 배치 작업 실행 시작
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.adapter.SoapAdapterService   : [SOAP] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 레거시 시스템 호출 시작
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.legacy.LegacySoapService     : [SOAP Legacy] 요청 처리: requestId=25ed2c12-56f3-4425-9bf0-60bd0ef17e8b
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.adapter.SoapAdapterService   : [SOAP] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 성공 (0ms): 레거시 시스템 처리 완료: 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [ation-adapter-7] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 메시지 발행 시작
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [tion-adapter-10] c.f.service.adapter.RestAdapterService   : [REST] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - REST 레거시 처리 시작
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [tion-adapter-10] c.f.service.legacy.LegacyRestService     : [REST Legacy] 요청 처리: {amount=500, currency=KRW}
+2026-04-25T20:27:46.830+09:00  INFO 23327 --- [FinBridge] [tion-adapter-10] c.f.service.adapter.RestAdapterService   : [REST] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 성공 (0ms): REST 외부 시스템 처리 완료
+2026-04-25T20:27:46.843+09:00  INFO 23327 --- [FinBridge] [ation-adapter-7] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 발행 성공 (13ms)
+2026-04-25T20:27:46.846+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] 메시지 수신: 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b|{"amount":500,"currency":"KRW"}
+2026-04-25T20:27:46.846+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] requestId=25ed2c12-56f3-4425-9bf0-60bd0ef17e8b 처리 완료
+2026-04-25T20:27:46.860+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] launched with the following parameters: [{'payload':'{value={"amount":500,"currency":"KRW"}, type=class java.lang.String, identifying=true}','requestId':'{value=25ed2c12-56f3-4425-9bf0-60bd0ef17e8b, type=class java.lang.String, identifying=true}','timestamp':'{value=1777116466830, type=class java.lang.Long, identifying=true}'}]
+2026-04-25T20:27:46.872+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] o.s.batch.core.job.SimpleStepHandler     : Executing step: [integrationStep]
+2026-04-25T20:27:46.885+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] com.finbridge.config.BatchJobConfig      : [BATCH Processor] 페이로드 처리 중: integration-payload
+2026-04-25T20:27:46.885+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] com.finbridge.config.BatchJobConfig      : [BATCH Writer] 처리 완료 항목 기록: processed-integration-payload
+2026-04-25T20:27:46.888+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] o.s.batch.core.step.AbstractStep         : Step: [integrationStep] executed in 16ms
+2026-04-25T20:27:46.903+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] completed with the following parameters: [{'payload':'{value={"amount":500,"currency":"KRW"}, type=class java.lang.String, identifying=true}','requestId':'{value=25ed2c12-56f3-4425-9bf0-60bd0ef17e8b, type=class java.lang.String, identifying=true}','timestamp':'{value=1777116466830, type=class java.lang.Long, identifying=true}'}] and the following status: [COMPLETED] in 34ms
+2026-04-25T20:27:46.903+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] c.f.service.adapter.BatchAdapterService  : [BATCH] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 완료 (73ms)
+2026-04-25T20:27:47.421+09:00  INFO 23327 --- [FinBridge] [ation-adapter-8] c.f.service.adapter.SftpAdapterService   : [SFTP] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b - 업로드 성공: finbridge-25ed2c12-56f3-4425-9bf0-60bd0ef17e8b.json (591ms)
+2026-04-25T20:27:47.493+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-6] c.finbridge.service.IntegrationService   : [INTEGRATION] 25ed2c12-56f3-4425-9bf0-60bd0ef17e8b 완료: ALL_SUCCESS
+2026-04-25T20:27:47.503+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-8] c.f.controller.IntegrationController     : [API] POST /api/integrate - protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:27:47.503+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-8] c.finbridge.service.IntegrationService   : [INTEGRATION] 요청 시작: requestId=4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9, protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] c.f.service.adapter.BatchAdapterService  : [BATCH] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 배치 작업 실행 시작
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-1] c.f.service.adapter.SoapAdapterService   : [SOAP] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 레거시 시스템 호출 시작
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-5] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 메시지 발행 시작
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-2] c.f.service.adapter.SftpAdapterService   : [SFTP] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 파일 업로드 시작: finbridge-4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9.json
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-1] c.f.service.legacy.LegacySoapService     : [SOAP Legacy] 요청 처리: requestId=4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-1] c.f.service.adapter.SoapAdapterService   : [SOAP] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 성공 (0ms): 레거시 시스템 처리 완료: 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-3] c.f.service.adapter.RestAdapterService   : [REST] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - REST 레거시 처리 시작
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-3] c.f.service.legacy.LegacyRestService     : [REST Legacy] 요청 처리: {amount=500, currency=KRW}
+2026-04-25T20:27:47.513+09:00  INFO 23327 --- [FinBridge] [ation-adapter-3] c.f.service.adapter.RestAdapterService   : [REST] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 성공 (0ms): REST 외부 시스템 처리 완료
+2026-04-25T20:27:47.526+09:00  INFO 23327 --- [FinBridge] [ation-adapter-5] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 발행 성공 (13ms)
+2026-04-25T20:27:47.527+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] 메시지 수신: 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9|{"amount":500,"currency":"KRW"}
+2026-04-25T20:27:47.527+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] requestId=4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 처리 완료
+2026-04-25T20:27:47.536+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] launched with the following parameters: [{'payload':'{value={"amount":500,"currency":"KRW"}, type=class java.lang.String, identifying=true}','requestId':'{value=4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9, type=class java.lang.String, identifying=true}','timestamp':'{value=1777116467513, type=class java.lang.Long, identifying=true}'}]
+2026-04-25T20:27:47.550+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.batch.core.job.SimpleStepHandler     : Executing step: [integrationStep]
+2026-04-25T20:27:47.557+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] com.finbridge.config.BatchJobConfig      : [BATCH Processor] 페이로드 처리 중: integration-payload
+2026-04-25T20:27:47.557+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] com.finbridge.config.BatchJobConfig      : [BATCH Writer] 처리 완료 항목 기록: processed-integration-payload
+2026-04-25T20:27:47.559+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.batch.core.step.AbstractStep         : Step: [integrationStep] executed in 8ms
+2026-04-25T20:27:47.570+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] completed with the following parameters: [{'payload':'{value={"amount":500,"currency":"KRW"}, type=class java.lang.String, identifying=true}','requestId':'{value=4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9, type=class java.lang.String, identifying=true}','timestamp':'{value=1777116467513, type=class java.lang.Long, identifying=true}'}] and the following status: [COMPLETED] in 30ms
+2026-04-25T20:27:47.570+09:00  INFO 23327 --- [FinBridge] [ation-adapter-4] c.f.service.adapter.BatchAdapterService  : [BATCH] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 완료 (57ms)
+2026-04-25T20:27:48.061+09:00  INFO 23327 --- [FinBridge] [ation-adapter-2] c.f.service.adapter.SftpAdapterService   : [SFTP] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 - 업로드 성공: finbridge-4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9.json (548ms)
+2026-04-25T20:27:48.107+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-8] c.finbridge.service.IntegrationService   : [INTEGRATION] 4ae07cc0-f9ce-4fc3-b5a1-2cd7e9eea1c9 완료: ALL_SUCCESS
+2026-04-25T20:27:48.205+09:00  INFO 23327 --- [FinBridge] [io-8080-exec-10] c.f.controller.IntegrationController     : [API] GET /api/integrate/25ed2c12-56f3-4425-9bf0-60bd0ef17e8b
+2026-04-25T20:49:58.987+09:00  WARN 23327 --- [FinBridge] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=11m32s824ms).
+2026-04-25T20:52:13.419+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:52:13.419+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-25T20:52:13.454+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: []
+2026-04-25T20:52:13.456+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1]
+2026-04-25T20:52:16.443+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1]
+2026-04-25T20:52:16.443+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: []
+2026-04-25T20:52:16.455+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:52:16.456+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-25T20:52:30.779+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] 메시지 수신: 220eebc4-f560-44e2-a45f-349f09eeffe9|{"amount":12000,"currency":"KRW","customerId":"e2e-customer-001"}
+2026-04-25T20:52:30.785+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] requestId=220eebc4-f560-44e2-a45f-349f09eeffe9 처리 완료
+2026-04-25T20:52:31.456+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-25T20:52:31.456+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:52:31.474+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:52:31.568+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-25T20:53:21.330+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-3] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=1, offset=0
+2026-04-25T20:53:21.330+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-2] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=1, offset=0
+2026-04-25T20:53:33.163+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-5] c.f.controller.IntegrationController     : [API] POST /api/integrate - protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:53:33.164+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-5] c.finbridge.service.IntegrationService   : [INTEGRATION] 요청 시작: requestId=19969f66-4ce5-4a91-83e2-8567d65ef6a1, protocols=[SOAP, KAFKA, SFTP, BATCH, REST]
+2026-04-25T20:53:33.188+09:00  INFO 23327 --- [FinBridge] [ation-adapter-7] c.f.service.adapter.SftpAdapterService   : [SFTP] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 파일 업로드 시작: finbridge-19969f66-4ce5-4a91-83e2-8567d65ef6a1.json
+2026-04-25T20:53:33.188+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.adapter.SoapAdapterService   : [SOAP] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 레거시 시스템 호출 시작
+2026-04-25T20:53:33.188+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.legacy.LegacySoapService     : [SOAP Legacy] 요청 처리: requestId=19969f66-4ce5-4a91-83e2-8567d65ef6a1
+2026-04-25T20:53:33.189+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.adapter.SoapAdapterService   : [SOAP] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 성공 (1ms): 레거시 시스템 처리 완료: 19969f66-4ce5-4a91-83e2-8567d65ef6a1
+2026-04-25T20:53:33.189+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.adapter.BatchAdapterService  : [BATCH] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 배치 작업 실행 시작
+2026-04-25T20:53:33.188+09:00  INFO 23327 --- [FinBridge] [tion-adapter-10] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 메시지 발행 시작
+2026-04-25T20:53:33.189+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] c.f.service.adapter.RestAdapterService   : [REST] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - REST 레거시 처리 시작
+2026-04-25T20:53:33.189+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] c.f.service.legacy.LegacyRestService     : [REST Legacy] 요청 처리: {qa=manual-smoke, amount=7777}
+2026-04-25T20:53:33.190+09:00  INFO 23327 --- [FinBridge] [ation-adapter-9] c.f.service.adapter.RestAdapterService   : [REST] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 성공 (1ms): REST 외부 시스템 처리 완료
+2026-04-25T20:53:33.221+09:00  INFO 23327 --- [FinBridge] [tion-adapter-10] c.f.service.adapter.KafkaAdapterService  : [KAFKA] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 발행 성공 (33ms)
+2026-04-25T20:53:33.226+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] 메시지 수신: 19969f66-4ce5-4a91-83e2-8567d65ef6a1|{"qa":"manual-smoke","amount":7777}
+2026-04-25T20:53:33.226+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] requestId=19969f66-4ce5-4a91-83e2-8567d65ef6a1 처리 완료
+2026-04-25T20:53:33.230+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] launched with the following parameters: [{'payload':'{value={"qa":"manual-smoke","amount":7777}, type=class java.lang.String, identifying=true}','requestId':'{value=19969f66-4ce5-4a91-83e2-8567d65ef6a1, type=class java.lang.String, identifying=true}','timestamp':'{value=1777118013189, type=class java.lang.Long, identifying=true}'}]
+2026-04-25T20:53:33.250+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] o.s.batch.core.job.SimpleStepHandler     : Executing step: [integrationStep]
+2026-04-25T20:53:33.258+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] com.finbridge.config.BatchJobConfig      : [BATCH Processor] 페이로드 처리 중: integration-payload
+2026-04-25T20:53:33.258+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] com.finbridge.config.BatchJobConfig      : [BATCH Writer] 처리 완료 항목 기록: processed-integration-payload
+2026-04-25T20:53:33.261+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] o.s.batch.core.step.AbstractStep         : Step: [integrationStep] executed in 11ms
+2026-04-25T20:53:33.276+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=integrationJob]] completed with the following parameters: [{'payload':'{value={"qa":"manual-smoke","amount":7777}, type=class java.lang.String, identifying=true}','requestId':'{value=19969f66-4ce5-4a91-83e2-8567d65ef6a1, type=class java.lang.String, identifying=true}','timestamp':'{value=1777118013189, type=class java.lang.Long, identifying=true}'}] and the following status: [COMPLETED] in 40ms
+2026-04-25T20:53:33.276+09:00  INFO 23327 --- [FinBridge] [ation-adapter-6] c.f.service.adapter.BatchAdapterService  : [BATCH] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 완료 (87ms)
+2026-04-25T20:53:33.770+09:00  INFO 23327 --- [FinBridge] [ation-adapter-7] c.f.service.adapter.SftpAdapterService   : [SFTP] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 - 업로드 성공: finbridge-19969f66-4ce5-4a91-83e2-8567d65ef6a1.json (582ms)
+2026-04-25T20:53:33.822+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-5] c.finbridge.service.IntegrationService   : [INTEGRATION] 19969f66-4ce5-4a91-83e2-8567d65ef6a1 완료: ALL_SUCCESS
+2026-04-25T20:53:48.320+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-7] c.f.controller.IntegrationController     : [API] GET /api/integrate/19969f66-4ce5-4a91-83e2-8567d65ef6a1
+2026-04-25T20:53:48.335+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-9] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=0, offset=0
+2026-04-25T20:53:48.342+09:00  INFO 23327 --- [FinBridge] [io-8080-exec-10] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=sftp, limit=3, offset=0
+2026-04-25T20:53:59.530+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-3] c.f.controller.IntegrationController     : [API] GET /api/integrate/no-such-request-id
+2026-04-25T20:53:59.560+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-5] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=bad, limit=10, offset=0
+2026-04-25T20:53:59.568+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-6] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=10, offset=-1
+2026-04-25T20:55:19.536+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:55:19.541+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-25T20:55:19.562+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: []
+2026-04-25T20:55:19.565+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-2]
+2026-04-25T20:55:22.552+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-2]
+2026-04-25T20:55:22.553+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: []
+2026-04-25T20:55:22.566+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:55:22.566+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-25T20:55:45.902+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] 메시지 수신: bcc32c17-d527-4169-af07-6f12e566bdb2|{"amount":12000,"customerId":"e2e-customer-001","currency":"KRW"}
+2026-04-25T20:55:45.903+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] c.f.service.KafkaConsumerService         : [KAFKA-CONSUMER] requestId=bcc32c17-d527-4169-af07-6f12e566bdb2 처리 완료
+2026-04-25T20:55:46.567+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:55:46.567+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-25T20:55:46.586+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:55:46.764+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
