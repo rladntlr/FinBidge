@@ -41,7 +41,8 @@ docker ps
 ### 2. SFTP known_hosts 등록
 
 SFTP는 `StrictHostKeyChecking=yes`로 동작합니다.
-처음 실행하는 환경에서는 로컬 SFTP 서버의 host key를 등록해야 합니다.
+Docker Compose는 로컬 데모용 SFTP host key를 `docker/sftp/host_keys/`에 고정해 둡니다.
+처음 실행하는 환경에서는 한 번만 로컬 `known_hosts`에 등록하면 됩니다.
 
 ```bash
 mkdir -p "$HOME/.ssh"
@@ -50,6 +51,11 @@ ssh-keygen -R "[localhost]:2222" -f "$HOME/.ssh/known_hosts"
 ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
 chmod 600 "$HOME/.ssh/known_hosts"
 ```
+
+`docker compose down -v`로 컨테이너와 볼륨을 지워도 SFTP host key는 repo의 고정 파일을 사용하므로 바뀌지 않습니다.
+단, `docker/sftp/host_keys/` 파일을 직접 교체한 경우에는 위 명령으로 `known_hosts`를 다시 등록해야 합니다.
+
+SFTP 업로드 디렉터리 권한은 `docker/sftp/init.d/fix-upload-permissions.sh`가 컨테이너 시작 시 자동 보정합니다.
 
 ### 3. 애플리케이션 실행
 
