@@ -1,0 +1,53 @@
+# ============================================================
+# 통합 테스트 전용 설정 (application.yml을 이 파일이 오버라이드)
+# ============================================================
+
+spring:
+
+  # ── DB: MySQL 대신 H2 인메모리 사용 ─────────────────────────
+  datasource:
+    url: jdbc:h2:mem:finbridge_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop          # Flyway 대신 JPA가 테이블 자동 생성/삭제
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # ── Flyway: MySQL 전용 스크립트이므로 테스트에서 비활성화 ─────
+  flyway:
+    enabled: false
+
+  # ── Spring Batch: 메타데이터 테이블 자동 생성 ────────────────
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+  # ── Kafka: 실제 Kafka 없이 기동 (어댑터는 MockBean으로 대체) ──
+  kafka:
+    bootstrap-servers: localhost:9092   # KafkaAdmin fail-fast 기본값이 false라 연결 실패해도 컨텍스트 기동
+    listener:
+      auto-startup: false              # KafkaConsumerService 리스너 자동 시작 방지
+
+# ── SFTP: SftpAdapterService가 MockBean이므로 실제 연결 없음 ──
+sftp:
+  host: localhost
+  port: 2222
+  username: test
+  password: test
+  upload-dir: /tmp
+  strict-host-key-checking: "no"
+  known-hosts: ""
+
+logging:
+  level:
+    com.finbridge: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
