@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.dto.RetryResponseDTO;
+import com.finbridge.model.entity.InterfaceConfig;
 import com.finbridge.model.entity.IntegrationRequest;
 import com.finbridge.model.entity.ProtocolResult;
 import com.finbridge.model.entity.SystemLog;
@@ -13,6 +14,7 @@ import com.finbridge.model.enums.OverallStatus;
 import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.ResultStatus;
 import com.finbridge.repository.IntegrationRequestRepository;
+import com.finbridge.repository.InterfaceConfigRepository;
 import com.finbridge.repository.ProtocolResultRepository;
 import com.finbridge.repository.SystemLogRepository;
 import com.finbridge.service.adapter.BatchAdapterService;
@@ -45,6 +47,7 @@ import static org.mockito.Mockito.*;
 class IntegrationServiceTest {
 
     @Mock private IntegrationRequestRepository integrationRequestRepository;
+    @Mock private InterfaceConfigRepository     interfaceConfigRepository;
     @Mock private ProtocolResultRepository      protocolResultRepository;
     @Mock private SystemLogRepository           systemLogRepository;
     @Mock private SoapAdapterService            soapAdapterService;
@@ -213,6 +216,50 @@ class IntegrationServiceTest {
                 .containsExactly(EventType.INITIATED, EventType.SUCCESS, EventType.SUCCESS);
         assertThat(logs.get(1).getProtocol()).isEqualTo(ProtocolType.REST);
         assertThat(logs.get(2).getProtocol()).isNull();
+    }
+
+    @Test
+    @DisplayName("enabled=false인 프로토콜은 Adapter를 실행하지 않고 DISABLED 결과로 저장한다")
+    void processIntegration_disabledProtocol_skipsAdapterAndPersistsDisabledResult() throws Exception {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        InterfaceConfig disabledRest = new InterfaceConfig();
+        disabledRest.setProtocol(ProtocolType.REST);
+        disabledRest.setEnabled(false);
+        when(interfaceConfigRepository.findByProtocol(ProtocolType.REST))
+                .thenReturn(List.of(disabledRest));
+
+        var request = buildRequest(List.of("REST"), Map.of());
+        IntegrationResponseDTO response = integrationService.processIntegration(request);
+
+        verify(restAdapterService, never()).execute(anyString(), any());
+        assertThat(response.getOverallStatus()).isEqualTo(OverallStatus.ALL_FAILED);
+        assertThat(response.getResults()).containsKey("REST");
+        assertThat(response.getResults().get("REST").getStatus()).isEqualTo(ResultStatus.FAILED);
+        assertThat(response.getResults().get("REST").getResponseCode()).isEqualTo("DISABLED");
+        assertThat(response.getResults().get("REST").getResponseMessage())
+                .isEqualTo("비활성화된 인터페이스입니다.");
+
+        var resultCaptor = org.mockito.ArgumentCaptor.forClass(ProtocolResult.class);
+        verify(protocolResultRepository).save(resultCaptor.capture());
+        assertThat(resultCaptor.getValue().getProtocol()).isEqualTo(ProtocolType.REST);
+        assertThat(resultCaptor.getValue().getResponseCode()).isEqualTo("DISABLED");
+    }
+
+    @Test
+    @DisplayName("프로토콜 설정이 없으면 기존처럼 Adapter를 실행한다")
+    void processIntegration_noInterfaceConfig_runsAdapter() throws Exception {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        when(interfaceConfigRepository.findByProtocol(ProtocolType.REST)).thenReturn(List.of());
+        when(restAdapterService.execute(anyString(), any()))
+                .thenReturn(new ProtocolResultDTO(ResultStatus.SUCCESS, "200", "OK", 10L));
+
+        var request = buildRequest(List.of("REST"), Map.of());
+        IntegrationResponseDTO response = integrationService.processIntegration(request);
+
+        verify(restAdapterService).execute(anyString(), any());
+        assertThat(response.getOverallStatus()).isEqualTo(OverallStatus.ALL_SUCCESS);
+        assertThat(response.getResults().get("REST").getStatus()).isEqualTo(ResultStatus.SUCCESS);
     }
 
     // =========================================================================
