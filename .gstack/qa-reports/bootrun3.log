@@ -1,0 +1,75 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources
+> Task :classes
+> Task :resolveMainClassName
+
+> Task :bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.4)
+
+2026-04-25T20:24:38.670+09:00  INFO 22701 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : Starting FinbridgeApplication using Java 17.0.17 with PID 22701 (/Users/kim/Desktop/uplus/FinBridge/build/classes/java/main started by kim in /Users/kim/Desktop/uplus/FinBridge)
+2026-04-25T20:24:38.671+09:00 DEBUG 22701 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : Running with Spring Boot v3.4.4, Spring v6.2.5
+2026-04-25T20:24:38.671+09:00  INFO 22701 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-04-25T20:24:38.976+09:00  INFO 22701 --- [FinBridge] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-04-25T20:24:39.006+09:00  INFO 22701 --- [FinBridge] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 25 ms. Found 3 JPA repository interfaces.
+2026-04-25T20:24:39.287+09:00  INFO 22701 --- [FinBridge] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-04-25T20:24:39.294+09:00  INFO 22701 --- [FinBridge] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-04-25T20:24:39.294+09:00  INFO 22701 --- [FinBridge] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.39]
+2026-04-25T20:24:39.337+09:00  INFO 22701 --- [FinBridge] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-04-25T20:24:39.337+09:00  INFO 22701 --- [FinBridge] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 648 ms
+2026-04-25T20:24:39.454+09:00  INFO 22701 --- [FinBridge] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-04-25T20:24:39.528+09:00  INFO 22701 --- [FinBridge] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@2801827a
+2026-04-25T20:24:39.529+09:00  INFO 22701 --- [FinBridge] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-04-25T20:24:39.552+09:00  INFO 22701 --- [FinBridge] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3307/finbridge?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul (MySQL 8.0)
+2026-04-25T20:24:39.582+09:00  INFO 22701 --- [FinBridge] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 3 migrations (execution time 00:00.012s)
+2026-04-25T20:24:39.591+09:00  INFO 22701 --- [FinBridge] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `finbridge`: 3
+2026-04-25T20:24:39.593+09:00  INFO 22701 --- [FinBridge] [           main] o.f.core.internal.command.DbMigrate      : Schema `finbridge` is up to date. No migration necessary.
+2026-04-25T20:24:39.637+09:00  INFO 22701 --- [FinBridge] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-04-25T20:24:39.661+09:00  INFO 22701 --- [FinBridge] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.11.Final
+2026-04-25T20:24:39.673+09:00  INFO 22701 --- [FinBridge] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-04-25T20:24:39.777+09:00  INFO 22701 --- [FinBridge] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-04-25T20:24:39.819+09:00  INFO 22701 --- [FinBridge] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.0.46
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-04-25T20:24:40.137+09:00  INFO 22701 --- [FinBridge] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-04-25T20:24:40.159+09:00  INFO 22701 --- [FinBridge] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-04-25T20:24:40.360+09:00  WARN 22701 --- [FinBridge] [           main] o.s.b.c.l.AbstractListenerFactoryBean    : org.springframework.batch.item.ItemReader is an interface. The implementing class will not be queried for annotation based listener configurations. If using @StepScope on a @Bean method, be sure to return the implementing class so listener annotations can be used.
+2026-04-25T20:24:40.405+09:00  INFO 22701 --- [FinBridge] [           main] .w.s.a.s.AnnotationActionEndpointMapping : Supporting [WS-Addressing August 2004, WS-Addressing 1.0]
+2026-04-25T20:24:40.782+09:00  WARN 22701 --- [FinBridge] [nBridge-admin-0] o.a.k.clients.admin.KafkaAdminClient     : [AdminClient clientId=FinBridge-admin-0] The DescribeTopicPartitions API is not supported, using Metadata API to describe topics.
+2026-04-25T20:24:40.799+09:00  INFO 22701 --- [FinBridge] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-04-25T20:24:40.862+09:00  INFO 22701 --- [FinBridge] [           main] com.finbridge.FinbridgeApplication       : Started FinbridgeApplication in 2.368 seconds (process running for 2.515)
+2026-04-25T20:24:59.462+09:00  INFO 22701 --- [FinBridge] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-04-25T20:24:59.462+09:00  INFO 22701 --- [FinBridge] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-04-25T20:24:59.465+09:00  INFO 22701 --- [FinBridge] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 3 ms
+2026-04-25T20:24:59.491+09:00  INFO 22701 --- [FinBridge] [nio-8080-exec-1] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=1, offset=0
+2026-04-25T20:25:21.082+09:00  INFO 22701 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-25T20:25:21.090+09:00  INFO 22701 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+
+> Task :bootRun FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':bootRun'.
+> Process 'command '/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home/bin/java'' finished with non-zero exit value 137 (this value may indicate that the process was terminated with the SIGKILL signal, which is often caused by the system running out of memory)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 5s
+4 actionable tasks: 3 executed, 1 up-to-date

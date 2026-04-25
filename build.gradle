@@ -25,9 +25,6 @@ dependencies {
     // Spring Data JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
-    // Thymeleaf (웹 UI)
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-
     // Kafka
     implementation 'org.springframework.kafka:spring-kafka'
 

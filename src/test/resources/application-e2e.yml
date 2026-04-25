@@ -1,0 +1,48 @@
+# ============================================================
+# Docker E2E test profile
+# Uses the same external services as local runtime:
+# MySQL + Flyway, Kafka, SFTP, Spring Batch metadata tables.
+# ============================================================
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3307/finbridge?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: root
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  batch:
+    job:
+      enabled: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+server:
+  port: 0
+
+sftp:
+  host: localhost
+  port: 2222
+  username: finbridge
+  password: finbridge123
+  upload-dir: /upload
+  strict-host-key-checking: "yes"
+  known-hosts: ${user.home}/.ssh/known_hosts
+
+logging:
+  level:
+    com.finbridge: INFO
+    org.springframework: WARN
+    org.hibernate: WARN

@@ -8,13 +8,13 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.ItemProcessor;
-import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 
 @Configuration
 @Slf4j
@@ -25,14 +25,8 @@ public class BatchJobConfig {
 
     @Bean
     @StepScope
-    public ItemReader<String> integrationItemReader() {
-        AtomicBoolean read = new AtomicBoolean(false);
-        return () -> {
-            if (read.compareAndSet(false, true)) {
-                return "integration-payload";
-            }
-            return null;
-        };
+    public ListItemReader<String> integrationItemReader() {
+        return new ListItemReader<>(List.of("integration-payload"));
     }
 
     @Bean
@@ -52,7 +46,7 @@ public class BatchJobConfig {
     @Bean
     public Step integrationStep(JobRepository jobRepository,
                                 PlatformTransactionManager transactionManager,
-                                ItemReader<String> integrationItemReader,
+                                ListItemReader<String> integrationItemReader,
                                 ItemProcessor<String, String> integrationItemProcessor,
                                 ItemWriter<String> integrationItemWriter) {
         return new StepBuilder("integrationStep", jobRepository)
