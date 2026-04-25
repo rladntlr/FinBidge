@@ -190,3 +190,27 @@
 2026-04-25T20:55:46.567+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
 2026-04-25T20:55:46.586+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
 2026-04-25T20:55:46.764+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-25T22:29:51.369+09:00  WARN 23327 --- [FinBridge] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1h5m52s19ms).
+2026-04-25T23:03:24.942+09:00  WARN 23327 --- [FinBridge] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=33m33s572ms).
+2026-04-25T23:46:19.504+09:00  WARN 23327 --- [FinBridge] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=42m54s549ms).
+2026-04-26T00:11:00.152+09:00  INFO 23327 --- [FinBridge] [nio-8080-exec-8] c.f.controller.IntegrationController     : [API] GET /api/logs - protocol=null, limit=1, offset=0
+2026-04-26T00:11:11.299+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-26T00:11:11.371+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-26T00:11:11.382+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-26T00:11:11.422+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-26T00:11:38.348+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-26T00:11:38.379+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: []
+2026-04-26T00:11:38.390+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-26T00:11:38.405+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-2]
+2026-04-26T00:14:26.441+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: []
+2026-04-26T00:14:26.469+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
+2026-04-26T00:14:26.497+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-2]
+2026-04-26T00:14:26.510+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-26T00:31:26.944+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: [integration-events-dlt-0]
+2026-04-26T00:31:26.944+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-26T00:31:26.995+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: []
+2026-04-26T00:31:27.002+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1]
+2026-04-26T00:31:29.970+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions revoked: []
+2026-04-26T00:31:29.970+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions revoked: [integration-events-0, integration-events-1]
+2026-04-26T00:31:29.988+09:00  INFO 23327 --- [FinBridge] [ntainer#1-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-group: partitions assigned: [integration-events-0, integration-events-1, integration-events-2]
+2026-04-26T00:31:29.990+09:00  INFO 23327 --- [FinBridge] [ntainer#0-0-C-1] o.s.k.l.KafkaMessageListenerContainer    : finbridge-dlt-group: partitions assigned: [integration-events-dlt-0]
