@@ -495,7 +495,10 @@ curl -s 'http://localhost:8080/api/performance/protocols'
 
 ## 로컬 데모 계정 정보
 
-Docker Compose 기준 로컬 데모 계정입니다.
+```bash
+ssh-keygen -R "[localhost]:2222" -f "$HOME/.ssh/known_hosts"
+ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
+```
 
 | 서비스 | 값 |
 | --- | --- |

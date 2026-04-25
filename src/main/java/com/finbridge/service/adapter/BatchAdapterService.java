@@ -1,6 +1,7 @@
 package com.finbridge.service.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finbridge.model.dto.AdapterExecutionConfig;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.enums.ResultStatus;
 import lombok.RequiredArgsConstructor;
@@ -27,13 +28,25 @@ public class BatchAdapterService implements ProtocolAdapter {
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
+        return execute(requestId, payload, null);
+    }
+
+    @Override
+    public ProtocolResultDTO execute(
+            String requestId,
+            Map<String, Object> payload,
+            AdapterExecutionConfig config
+    ) {
         long startTime = System.currentTimeMillis();
-        log.info("[BATCH] {} - 배치 작업 실행 시작", requestId);
+        String configuredJobName = endpointOrDefault(config, integrationJob.getName());
+        log.info("[BATCH] {} - 배치 작업 실행 시작: configuredJobName={}", requestId, configuredJobName);
 
         try {
             JobParameters params = new JobParametersBuilder()
                     .addString("requestId", requestId)
                     .addString("payload", objectMapper.writeValueAsString(payload))
+                    .addString("configuredJobName", configuredJobName)
+                    .addString("interfaceName", interfaceNameOrDefault(config))
                     .addLong("timestamp", System.currentTimeMillis())
                     .toJobParameters();
 
@@ -48,7 +61,8 @@ public class BatchAdapterService implements ProtocolAdapter {
             if (batchStatus == BatchStatus.COMPLETED) {
                 log.info("[BATCH] {} - 완료 ({}ms)", requestId, executionTimeMs);
                 return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
-                        "배치 작업 완료 (jobId: " + execution.getJobId() + ")", executionTimeMs);
+                        "배치 작업 완료[" + configuredJobName + "] (jobId: " + execution.getJobId() + ")",
+                        executionTimeMs);
             } else {
                 log.warn("[BATCH] {} - 비정상 종료: {}", requestId, batchStatus);
                 return new ProtocolResultDTO(ResultStatus.FAILED, "500",
@@ -61,5 +75,20 @@ public class BatchAdapterService implements ProtocolAdapter {
 
             return new ProtocolResultDTO(ResultStatus.FAILED, "500", e.getMessage(), executionTimeMs);
         }
+    }
+
+    private String endpointOrDefault(AdapterExecutionConfig config, String defaultEndpoint) {
+        if (config != null && config.getEndpoint() != null && !config.getEndpoint().isBlank()) {
+            return config.getEndpoint();
+        }
+        return defaultEndpoint != null && !defaultEndpoint.isBlank()
+                ? defaultEndpoint
+                : "integrationJob";
+    }
+
+    private String interfaceNameOrDefault(AdapterExecutionConfig config) {
+        return config != null && config.getInterfaceName() != null
+                ? config.getInterfaceName()
+                : "default";
     }
 }

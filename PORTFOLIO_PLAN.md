@@ -84,7 +84,25 @@ MySQL, Kafka, SFTP를 Docker Compose로 실행한다. Flyway는 도메인 테이
 
 ### 4.6 웹 콘솔
 
-정적 HTML 기반 웹 콘솔을 제공한다. 프로토콜 선택, 샘플 요청 실행, 결과 확인, 로그 조회를 브라우저에서 확인할 수 있다. 이 화면은 운영 대시보드의 완성형이라기보다, 포트폴리오 제출과 로컬 데모를 위한 기능 확인용 콘솔이다.
+정적 HTML 기반 웹 콘솔을 제공한다. 프로토콜 선택, 통합 요청 실행, 결과 조회, 로그 조회뿐 아니라 인터페이스 등록/설정, 실패 프로토콜 재처리, 모니터링 요약, 프로토콜별 성능 지표를 브라우저에서 확인할 수 있다. 이 화면은 운영 대시보드의 완성형이라기보다, 포트폴리오 제출과 로컬 데모를 위한 기능 확인용 콘솔이다.
+
+### 4.7 실패 프로토콜 재처리
+
+`POST /api/integrate/{requestId}/retry`로 이전 요청에서 실패하거나 타임아웃된 프로토콜을 재처리할 수 있다. protocols를 명시하면 지정된 프로토콜만 재처리한다. 생략하면 원본 요청에서 FAILED 또는 TIMEOUT 상태인 프로토콜을 자동으로 선택한다. 재처리 결과는 새 requestId로 독립 추적된다.
+
+### 4.8 인터페이스 등록 및 설정 관리
+
+`GET/POST/PUT /api/interfaces`로 프로토콜별 인터페이스를 등록하고 설정을 관리할 수 있다. 각 인터페이스는 이름, endpoint, timeout, enabled 여부를 가진다. enabled=false로 설정된 프로토콜은 통합 요청에서 어댑터 실행 없이 DISABLED 결과로 처리된다. enabled=true인 경우 endpoint와 timeoutMs 설정이 Adapter 실행에 전달된다.
+
+Kafka는 endpoint를 발행 topic으로 사용하고 timeoutMs를 메시지 발행 대기 시간으로 사용한다. SFTP는 endpoint를 업로드 디렉터리로 사용하고 timeoutMs를 session/channel 연결 timeout으로 사용한다. Batch는 endpoint와 interfaceName을 JobParameters로 전달한다. REST와 SOAP은 현재 내부 legacy service 구조에서 endpoint를 호출 대상 식별값으로 로그와 결과 메시지에 반영한다.
+
+웹 콘솔에서 인터페이스 목록 조회, 등록, enabled 여부 변경, 설정 수정이 가능하다.
+
+### 4.9 모니터링과 성능관리
+
+`GET /api/monitoring/summary`로 전체 요청 수, 처리 중 요청 수, 완료 요청 수, 전체 성공/부분 실패/전체 실패 건수, 전체 로그 수를 조회할 수 있다.
+
+`GET /api/performance/protocols`는 프로토콜별 처리 건수, 성공/실패/타임아웃 건수, 성공률, 평균 실행 시간을 제공한다. 웹 콘솔에서도 운영자가 이 지표를 확인할 수 있어, 실행 결과뿐 아니라 전체 처리 현황과 프로토콜별 품질을 함께 볼 수 있다.
 
 ---
 
@@ -112,6 +130,20 @@ MySQL, Kafka, SFTP를 Docker Compose로 실행한다. Flyway는 도메인 테이
 3. 실패한 프로토콜과 응답 메시지를 확인한다.
 4. `GET /api/logs?protocol=...`로 해당 프로토콜 로그를 좁혀 본다.
 
+### 시나리오 4. 실패 프로토콜 재처리
+
+1. 운영자가 requestId로 처리 결과를 조회해 SFTP가 FAILED 상태임을 확인한다.
+2. `POST /api/integrate/{requestId}/retry`를 호출한다. protocols를 생략하면 FAILED 프로토콜이 자동 선택된다.
+3. 재처리 결과가 새 requestId로 반환된다.
+4. 운영자는 originalRequestId와 retryRequestId를 함께 기록해 이력을 연결한다.
+
+### 시나리오 5. 인터페이스 비활성화
+
+1. 연계 담당자가 특정 외부 시스템의 점검으로 SOAP 연계를 일시 중단해야 한다.
+2. `PUT /api/interfaces/{id}`로 SOAP 인터페이스의 enabled를 false로 변경한다.
+3. 이후 들어오는 통합 요청에서 SOAP은 어댑터 실행 없이 DISABLED로 처리된다.
+4. 점검이 끝나면 enabled를 다시 true로 변경해 복구한다.
+
 ---
 
 ## 6. MVP 범위
@@ -132,12 +164,19 @@ MySQL, Kafka, SFTP를 Docker Compose로 실행한다. Flyway는 도메인 테이
 - Docker Compose 실행 환경
 - 단위 테스트, H2 기반 통합 테스트, Docker E2E 테스트
 - 기능 확인용 웹 콘솔
+- `POST /api/integrate/{requestId}/retry` 재처리 API
+- `GET/POST/PUT /api/interfaces` 인터페이스 등록 및 설정 관리 API
+- `GET /api/monitoring/summary` 모니터링 요약 API
+- `GET /api/performance/protocols` 프로토콜별 성능관리 API
+- 프로토콜 enabled/disabled 실행 반영
+- endpoint, timeoutMs 등 인터페이스 설정값의 Adapter 실행 반영
+- 인터페이스 관리 웹 콘솔 UI
+- 모니터링/성능관리 웹 콘솔 UI
 
 MVP에서 제외한 범위:
 
 - 사용자 인증과 권한 관리
 - 운영용 대시보드 차트
-- 실패 건 재처리 API
 - Slack, Email 등 알림 연동
 - 실제 외부 금융기관 시스템 연동
 - 운영 배포 환경 구성
@@ -176,7 +215,7 @@ Docker Compose로 MySQL, Kafka, SFTP를 실행하고, Flyway로 스키마를 관
 
 ### 8.4 리뷰와 테스트를 거쳐 안정성 이슈를 정리
 
-Batch 메타데이터 테이블, Kafka advertised listener, SFTP host key, 로그 페이지네이션, 프로토콜 검증, timeout 이후 late result 저장 문제 등 런타임에서 터질 수 있는 항목을 리뷰와 테스트를 통해 정리했다.
+Batch 메타데이터 테이블, Kafka advertised listener, SFTP host key, 로그 페이지네이션, 프로토콜 검증, timeout 처리, Adapter 결과 저장 책임 중앙화 등 런타임에서 문제가 될 수 있는 항목을 리뷰와 테스트를 통해 정리했다.
 
 ---
 
@@ -188,7 +227,7 @@ Batch 메타데이터 테이블, Kafka advertised listener, SFTP host key, 로�
 
 ### 운영 대시보드
 
-현재 웹 콘솔은 기능 확인용이다. 운영 대시보드로 확장하려면 프로토콜별 성공률, 평균 응답 시간, 실패 추이, 최근 장애 현황을 시각화할 수 있다.
+현재 웹 콘솔은 프로토콜별 성공률과 평균 실행 시간을 테이블로 제공한다. 운영 대시보드로 확장하려면 기간별 성공률 추이, p95/p99 latency, SLA 초과 건수, 최근 장애 현황, 알림 상태 등을 차트로 시각화할 수 있다.
 
 ### 알림
 
@@ -196,7 +235,7 @@ Batch 메타데이터 테이블, Kafka advertised listener, SFTP host key, 로�
 
 ### 재처리
 
-현재는 요청 실행과 조회에 집중한다. 향후에는 실패한 프로토콜만 재처리하는 API를 추가할 수 있다.
+실패 프로토콜 단위 재처리 API는 구현되어 있다. 운영 확장 시에는 재처리 이력 연결 조회, 재처리 횟수 제한, 자동 재처리 스케줄링을 추가할 수 있다.
 
 ### 실제 외부 기관 연계
 
@@ -216,8 +255,8 @@ Batch 메타데이터 테이블, Kafka advertised listener, SFTP host key, 로�
 
 ### 어디까지가 현재 구현이고 어디부터가 확장인가
 
-현재 구현은 로컬에서 실행 가능한 MVP다. 인증, 운영 대시보드, 알림, 재처리, 실제 기관 연계는 향후 확장 범위로 명확히 분리했다.
+현재 구현은 로컬에서 실행 가능한 MVP다. 실패 프로토콜 재처리까지는 구현되어 있으며, 인증, 운영용 대시보드 고도화, 알림, 실제 기관 연계는 향후 확장 범위로 명확히 분리했다.
 
 ### 기술적으로 어떤 점을 보여줄 수 있는가
 
-Spring Boot 기반 API 설계, JPA/Flyway 스키마 관리, Kafka 메시징, SFTP 파일 전송, Spring Batch 실행, SOAP/REST 어댑터 구조, CompletableFuture 병렬 처리, Docker E2E 테스트를 하나의 프로젝트 안에서 설명할 수 있다.
+Spring Boot 기반 API 설계, JPA/Flyway 스키마 관리, Kafka 메시징, SFTP 파일 전송, Spring Batch 실행, SOAP/REST 어댑터 구조, CompletableFuture 병렬 처리, Docker E2E 테스트를 하나의 프로젝트 안에서 설명할 수 있다. 재처리 API 설계(원본 requestId 기반 FAILED/TIMEOUT 자동 선택, 새 requestId 독립 추적), 인터페이스 설정 도메인(DB 기반 enabled/disabled, 어댑터 실행 전 설정값 반영)도 함께 설명할 수 있다.

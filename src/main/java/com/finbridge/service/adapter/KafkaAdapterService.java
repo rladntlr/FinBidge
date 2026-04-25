@@ -2,6 +2,7 @@ package com.finbridge.service.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.config.KafkaConfig;
+import com.finbridge.model.dto.AdapterExecutionConfig;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.enums.ResultStatus;
 import lombok.RequiredArgsConstructor;
@@ -23,23 +24,33 @@ public class KafkaAdapterService implements ProtocolAdapter {
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
+        return execute(requestId, payload, null);
+    }
+
+    @Override
+    public ProtocolResultDTO execute(
+            String requestId,
+            Map<String, Object> payload,
+            AdapterExecutionConfig config
+    ) {
         long startTime = System.currentTimeMillis();
-        log.info("[KAFKA] {} - 메시지 발행 시작", requestId);
+        String topic = endpointOrDefault(config, KafkaConfig.INTEGRATION_TOPIC);
+        long timeoutMs = timeoutOrDefault(config, 5_000L);
+        log.info("[KAFKA] {} - 메시지 발행 시작: topic={}, timeoutMs={}", requestId, topic, timeoutMs);
 
         try {
             String message = requestId + "|" + objectMapper.writeValueAsString(payload);
 
             CompletableFuture<SendResult<String, String>> future =
-                    kafkaTemplate.send(KafkaConfig.INTEGRATION_TOPIC, requestId, message);
+                    kafkaTemplate.send(topic, requestId, message);
 
-            // 발행 완료 대기 (최대 5초)
-            future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            future.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
-            log.info("[KAFKA] {} - 발행 성공 ({}ms)", requestId, executionTimeMs);
+            log.info("[KAFKA] {} - 발행 성공 ({}ms, topic={})", requestId, executionTimeMs, topic);
 
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
-                    "Kafka 메시지 발행 완료", executionTimeMs);
+                    "Kafka 메시지 발행 완료: " + topic, executionTimeMs);
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
@@ -48,5 +59,17 @@ public class KafkaAdapterService implements ProtocolAdapter {
             return new ProtocolResultDTO(ResultStatus.FAILED, "500",
                     e.getMessage(), executionTimeMs);
         }
+    }
+
+    private String endpointOrDefault(AdapterExecutionConfig config, String defaultEndpoint) {
+        return config != null && config.getEndpoint() != null && !config.getEndpoint().isBlank()
+                ? config.getEndpoint()
+                : defaultEndpoint;
+    }
+
+    private long timeoutOrDefault(AdapterExecutionConfig config, long defaultTimeoutMs) {
+        return config != null && config.getTimeoutMs() != null && config.getTimeoutMs() > 0
+                ? config.getTimeoutMs()
+                : defaultTimeoutMs;
     }
 }

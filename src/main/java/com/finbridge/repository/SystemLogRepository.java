@@ -19,6 +19,8 @@ public interface SystemLogRepository extends JpaRepository<SystemLog, Long> {
 
     Page<SystemLog> findByProtocol(ProtocolType protocol, Pageable pageable);
 
+    Page<SystemLog> findAll(Pageable pageable);
+
     long countByProtocol(ProtocolType protocol);
 
     List<SystemLog> findByTimestampBetween(LocalDateTime start, LocalDateTime end);

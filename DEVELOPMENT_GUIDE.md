@@ -10,7 +10,7 @@
 
 FinBridge는 금융 IT 인터페이스 통합관리 시스템이다.
 
-클라이언트가 `POST /api/integrate`로 통합 요청을 보내면, 서버는 요청된 프로토콜을 확인한 뒤 SOAP, Kafka, SFTP, Batch, REST 어댑터를 병렬로 실행한다. 각 어댑터는 실행 결과만 DTO로 반환하고, 최종 `ProtocolResult` 저장과 `SystemLog` 저장은 `IntegrationService`가 중앙에서 처리한다.
+클라이언트가 `POST /api/integrate`로 통합 요청을 보내면, 서버는 요청된 프로토콜을 확인한 뒤 등록된 인터페이스 설정을 조회한다. `enabled=false`인 프로토콜은 어댑터를 실행하지 않고 `DISABLED` 결과로 확정한다. 활성화된 프로토콜은 SOAP, Kafka, SFTP, Batch, REST 어댑터를 병렬로 실행한다. 각 어댑터는 실행 결과만 DTO로 반환하고, 최종 `ProtocolResult` 저장과 `SystemLog` 저장은 `IntegrationService`가 중앙에서 처리한다.
 
 핵심 흐름은 다음과 같다.
 
@@ -26,7 +26,9 @@ IntegrationService
   |
   | 2. requestId 생성, IntegrationRequest 저장, INITIATED 로그 저장
   |
-  | 3. CompletableFuture + integrationTaskExecutor로 어댑터 병렬 실행
+  | 3. InterfaceConfig 조회(enabled, endpoint, timeoutMs)
+  |
+  | 4. CompletableFuture + integrationTaskExecutor로 활성 어댑터 병렬 실행
   |
   +--> SoapAdapterService  -> LegacySoapService
   +--> KafkaAdapterService -> Kafka topic publish
@@ -34,9 +36,9 @@ IntegrationService
   +--> BatchAdapterService -> Spring Batch JobLauncher
   +--> RestAdapterService  -> LegacyRestService
   |
-  | 4. 35초 timeout 기준으로 결과 수집
+  | 5. 35초 timeout 기준으로 결과 수집
   |
-  | 5. ProtocolResult 저장, SystemLog 저장, overallStatus 계산
+  | 6. ProtocolResult 저장, SystemLog 저장, overallStatus 계산
   v
 IntegrationResponseDTO
 ```
@@ -56,14 +58,23 @@ src/main/java/com/finbridge
 │   ├── SoapConfig.java
 │   └── WebConfig.java
 ├── controller
-│   └── IntegrationController.java
+│   ├── IntegrationController.java
+│   ├── InterfaceConfigController.java
+│   └── MonitoringController.java
 ├── model
 │   ├── dto
+│   │   ├── AdapterExecutionConfig.java
+│   │   ├── InterfaceConfigDTO.java
 │   │   ├── IntegrationRequestDTO.java
 │   │   ├── IntegrationResponseDTO.java
 │   │   ├── LogResponseDTO.java
-│   │   └── ProtocolResultDTO.java
+│   │   ├── MonitoringSummaryDTO.java
+│   │   ├── ProtocolPerformanceDTO.java
+│   │   ├── ProtocolResultDTO.java
+│   │   ├── RetryRequestDTO.java
+│   │   └── RetryResponseDTO.java
 │   ├── entity
+│   │   ├── InterfaceConfig.java
 │   │   ├── IntegrationRequest.java
 │   │   ├── ProtocolResult.java
 │   │   └── SystemLog.java
@@ -74,12 +85,15 @@ src/main/java/com/finbridge
 │       ├── RequestStatus.java
 │       └── ResultStatus.java
 ├── repository
+│   ├── InterfaceConfigRepository.java
 │   ├── IntegrationRequestRepository.java
 │   ├── ProtocolResultRepository.java
 │   └── SystemLogRepository.java
 ├── service
+│   ├── InterfaceConfigService.java
 │   ├── IntegrationService.java
 │   ├── KafkaConsumerService.java
+│   ├── MonitoringService.java
 │   ├── adapter
 │   │   ├── BatchAdapterService.java
 │   │   ├── KafkaAdapterService.java
@@ -103,6 +117,8 @@ src/main/java/com/finbridge
 | --- | --- |
 | `controller` | API 요청 검증, 응답 상태 코드 결정 |
 | `service.IntegrationService` | 통합 요청 생명주기, 병렬 실행, 결과 저장, 로그 저장 |
+| `service.InterfaceConfigService` | 인터페이스 등록/수정/조회와 설정 검증 |
+| `service.MonitoringService` | 요청 현황과 프로토콜별 성능 통계 조회 |
 | `service.adapter` | 프로토콜별 실행 로직 |
 | `service.legacy` | 로컬 데모용 REST/SOAP 레거시 처리 |
 | `config` | Kafka, Batch, SOAP, CORS, Executor 설정 |
@@ -157,18 +173,22 @@ SOAP, KAFKA, SFTP, BATCH, REST
    - `integration_requests` 저장
    - `INITIATED` 시스템 로그 저장
    - 요청 상태를 `PROCESSING`으로 변경
-3. 요청된 프로토콜별 `CompletableFuture` 생성
-4. `integrationTaskExecutor`로 어댑터 병렬 실행
-5. `CompletableFuture.allOf(...).orTimeout(35, TimeUnit.SECONDS)`로 최대 35초 대기
-6. 완료된 결과를 `ProtocolResultDTO`로 수집
-7. timeout 또는 예외는 실패 결과로 변환
-8. `determineOverallStatus()`로 전체 상태 계산
-9. `saveFinalResults()` 호출
+3. 요청된 프로토콜별 `InterfaceConfig` 조회
+   - 설정 row가 없으면 기존 기본 동작으로 실행
+   - 설정이 있고 enabled=true인 row가 있으면 해당 설정을 Adapter에 전달
+   - 설정이 있지만 모두 enabled=false이면 Adapter를 실행하지 않고 `FAILED / DISABLED` 결과 생성
+4. 활성 프로토콜별 `CompletableFuture` 생성
+5. `integrationTaskExecutor`로 어댑터 병렬 실행
+6. `CompletableFuture.allOf(...).orTimeout(35, TimeUnit.SECONDS)`로 최대 35초 대기
+7. 완료된 결과를 `ProtocolResultDTO`로 수집
+8. timeout 또는 예외는 실패 결과로 변환
+9. `determineOverallStatus()`로 전체 상태 계산
+10. `saveFinalResults()` 호출
    - 프로토콜별 `ProtocolResult` 저장
    - 프로토콜별 `SystemLog` 저장
    - `integration_requests`를 `COMPLETED`로 변경
    - 최종 완료 로그 저장
-10. `IntegrationResponseDTO` 반환
+11. `IntegrationResponseDTO` 반환
 
 ### 3.3 GET /api/integrate/{requestId}
 
@@ -194,6 +214,52 @@ SOAP, KAFKA, SFTP, BATCH, REST
 
 서비스는 `OffsetBasedPageRequest`로 offset 기반 페이지네이션을 구성한다.
 
+### 3.5 POST /api/integrate/{requestId}/retry
+
+`IntegrationController.retry()`가 `IntegrationService.retryIntegration()`을 호출한다.
+
+처리 흐름:
+
+1. 원본 `requestId`로 `IntegrationRequest`를 조회한다.
+2. 원본 요청이 없으면 404를 반환한다.
+3. 요청 body의 `protocols`가 있으면 해당 프로토콜만 재처리 대상으로 사용한다.
+4. `protocols`가 없거나 비어 있으면 원본 요청의 `ProtocolResult` 중 `SUCCESS`가 아닌 프로토콜을 자동 선택한다.
+5. 재처리 대상이 없으면 400을 반환한다.
+6. 원본 payload를 복원해 새 `IntegrationRequestDTO`를 만든다.
+7. `processIntegration()`을 다시 호출해 새 `requestId`로 독립 실행한다.
+
+재처리는 기존 `ProtocolResult`를 덮어쓰지 않는다. 새 요청으로 저장되며 응답은 `originalRequestId`, `retryRequestId`, `retryResponse`를 포함한다.
+
+### 3.6 인터페이스 등록/설정 API
+
+`InterfaceConfigController`는 `/api/interfaces` 하위 API를 제공한다.
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/interfaces` | 전체 인터페이스 설정 조회 |
+| `GET /api/interfaces?protocol=SFTP` | 특정 프로토콜 설정 조회 |
+| `POST /api/interfaces` | 인터페이스 설정 생성 |
+| `PUT /api/interfaces/{id}` | 인터페이스 설정 수정 |
+
+검증 규칙:
+
+- `protocol`은 필수이며 `SOAP`, `KAFKA`, `SFTP`, `BATCH`, `REST` 중 하나여야 한다.
+- `interfaceName`은 필수다.
+- `endpoint`는 필수다.
+- `timeoutMs`는 null이거나 1 이상이어야 한다.
+- `enabled`가 null이면 true로 저장한다.
+
+현재 실행 흐름에서 프로토콜별 설정 row가 여러 개일 수 있다. `IntegrationService`는 enabled=true인 첫 번째 설정을 Adapter 실행 설정으로 사용한다. 같은 프로토콜의 모든 설정이 disabled이면 해당 프로토콜은 실행하지 않는다.
+
+### 3.7 모니터링/성능관리 API
+
+`MonitoringController`는 운영자가 현재 처리 현황을 조회할 수 있는 API를 제공한다.
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/monitoring/summary` | 전체 요청 수, 처리 중/완료 요청 수, overallStatus별 건수, 전체 로그 수, 최근 로그 10건 |
+| `GET /api/performance/protocols` | 프로토콜별 전체/성공/실패/타임아웃 건수, 성공률, 평균 실행시간 |
+
 ---
 
 ## 4. 병렬 처리 구조
@@ -206,11 +272,11 @@ SOAP, KAFKA, SFTP, BATCH, REST
 
 ```java
 futures.put("SFTP", CompletableFuture.supplyAsync(
-        () -> sftpAdapterService.execute(requestId, request.getPayload()),
+        () -> sftpAdapterService.execute(requestId, request.getPayload(), adapterConfig),
         integrationTaskExecutor));
 ```
 
-요청에 포함된 프로토콜만 future에 추가된다.
+요청에 포함된 프로토콜만 실행 대상이 된다. 단, 인터페이스 설정이 모두 disabled인 프로토콜은 future에 추가하지 않고 즉시 `DISABLED` 결과로 확정한다.
 
 ### 4.2 integrationTaskExecutor
 
@@ -261,6 +327,30 @@ return Executors.newFixedThreadPool(10, threadFactory);
 
 외부 어댑터 실행은 트랜잭션 밖에서 수행된다.
 
+요청에 포함된 프로토콜만 future에 추가된다.
+
+### 4.2 integrationTaskExecutor
+
+`IntegrationExecutorConfig`에서 별도 ExecutorService를 등록한다.
+
+```java
+return Executors.newFixedThreadPool(10, threadFactory);
+```
+
+스레드 이름은 `integration-adapter-1`, `integration-adapter-2` 형식이다. 장애 분석 시 스레드 덤프에서 통합 어댑터 작업을 구분하기 쉽다.
+
+### 4.3 35초 timeout
+
+`CompletableFuture.allOf(...).orTimeout(35, TimeUnit.SECONDS)`를 사용한다.
+
+동작:
+
+- 모든 future가 35초 안에 끝나면 각 결과를 수집한다.
+- 아직 끝나지 않은 future는 `TIMEOUT`, `504`, `35초 내 응답 없음` 결과로 변환한다.
+- 이미 끝났지만 예외가 발생한 future는 `FAILED`, `500` 결과로 변환한다.
+
+이 설계는 API 응답과 DB 저장 결과를 `IntegrationService`에서 한 번만 확정하기 위한 구조다.
+
 ---
 
 ## 6. 결과 저장 책임
@@ -291,7 +381,34 @@ DB 저장은 하지 않는다.
 
 ```java
 ProtocolResultDTO execute(String requestId, Map<String, Object> payload);
+
+default ProtocolResultDTO execute(
+        String requestId,
+        Map<String, Object> payload,
+        AdapterExecutionConfig config
+);
 ```
+
+두 번째 메서드는 인터페이스 설정을 Adapter 실행에 전달하기 위해 추가한 확장 지점이다. 기존 테스트나 설정 없는 실행 흐름은 2-argument `execute()`를 그대로 사용할 수 있고, 설정 row가 있는 실행은 `AdapterExecutionConfig`를 전달한다.
+
+`AdapterExecutionConfig` 필드:
+
+| 필드 | 의미 |
+| --- | --- |
+| `protocol` | 실행 프로토콜 |
+| `interfaceName` | 관리 화면에 등록된 인터페이스 이름 |
+| `endpoint` | Adapter별 대상 식별값 |
+| `timeoutMs` | Adapter별 timeout 값 |
+
+프로토콜별 반영 방식:
+
+| 프로토콜 | endpoint 반영 | timeoutMs 반영 |
+| --- | --- | --- |
+| SOAP | 내부 legacy 호출 대상 식별값으로 로그/결과 메시지에 반영 | 현재 직접 통신 timeout 없음 |
+| Kafka | 발행 topic으로 사용 | `KafkaTemplate.send()` 완료 대기 시간 |
+| SFTP | 업로드 디렉터리로 사용 | session/channel connect timeout |
+| Batch | `configuredJobName` JobParameter로 전달 | 현재 Job 실행 timeout 없음 |
+| REST | 내부 legacy 호출 대상 식별값으로 로그/결과 메시지에 반영 | 현재 직접 통신 timeout 없음 |
 
 ### 7.1 SOAP
 
@@ -313,6 +430,8 @@ ProtocolResultDTO execute(String requestId, Map<String, Object> payload);
 
 `SoapEndpoint`와 XSD는 SOAP endpoint 구조를 남겨둔 컴포넌트다. 현재 통합 흐름의 SOAP 어댑터는 직접 legacy service를 호출한다.
 
+`AdapterExecutionConfig.endpoint`가 전달되면 실제 외부 SOAP URL 호출 대신 현재 내부 legacy 호출 대상 식별값으로 로그와 결과 메시지에 포함한다. 운영 확장 시 이 값을 `WebServiceTemplate`의 endpoint URI로 사용할 수 있다.
+
 ### 7.2 Kafka
 
 파일:
@@ -325,9 +444,12 @@ Producer 흐름:
 
 1. payload를 JSON으로 직렬화한다.
 2. 메시지를 `requestId|payloadJson` 형식으로 만든다.
-3. topic `integration-events`에 key=`requestId`, value=`message`로 발행한다.
-4. `future.get(5, TimeUnit.SECONDS)`로 발행 완료를 최대 5초 대기한다.
-5. 성공 시 `SUCCESS`, 실패 시 `FAILED`를 반환한다.
+3. topic에 key=`requestId`, value=`message`로 발행한다.
+4. 기본 topic은 `integration-events`다.
+5. 인터페이스 설정이 있으면 `AdapterExecutionConfig.endpoint`를 topic으로 사용한다.
+6. 기본 발행 대기 시간은 5초다.
+7. 인터페이스 설정이 있으면 `timeoutMs`를 `future.get(timeoutMs, TimeUnit.MILLISECONDS)`에 사용한다.
+8. 성공 시 `SUCCESS`, 실패 시 `FAILED`를 반환한다.
 
 Consumer 흐름:
 
@@ -360,9 +482,11 @@ DLT는 dead letter topic의 약자다. 여러 번 처리에 실패한 메시지�
 2. 파일명을 `finbridge-{requestId}.json`으로 만든다.
 3. JSch session을 생성한다.
 4. `StrictHostKeyChecking=yes`이면 `known_hosts`를 등록한다.
-5. session connect timeout 10초, channel connect timeout 10초로 연결한다.
-6. `${sftp.upload-dir}` 아래에 파일을 업로드한다.
-7. finally에서 channel과 session을 disconnect한다.
+5. 기본 session connect timeout과 channel connect timeout은 10초다.
+6. 인터페이스 설정이 있으면 `timeoutMs`를 session/channel connect timeout으로 사용한다.
+7. 기본 업로드 디렉터리는 `${sftp.upload-dir}`이다.
+8. 인터페이스 설정이 있으면 `endpoint`를 업로드 디렉터리로 사용한다.
+9. finally에서 channel과 session을 disconnect한다.
 
 로컬 Docker SFTP는 host key를 repo에 고정한다. 따라서 컨테이너를 지웠다가 다시 띄워도 `[localhost]:2222` host key가 바뀌지 않는다.
 
@@ -378,7 +502,7 @@ DLT는 dead letter topic의 약자다. 여러 번 처리에 실패한 메시지�
 
 처리:
 
-1. `JobParameters`에 `requestId`, `payload`, `timestamp`를 넣는다.
+1. `JobParameters`에 `requestId`, `payload`, `timestamp`, `configuredJobName`, `interfaceName`을 넣는다.
 2. `JobLauncher.run(integrationJob, params)`를 호출한다.
 3. `BatchStatus.COMPLETED`면 `SUCCESS`, 아니면 `FAILED`를 반환한다.
 
@@ -387,6 +511,8 @@ DLT는 dead letter topic의 약자다. 여러 번 처리에 실패한 메시지�
 `integrationItemReader()`는 `@StepScope`가 붙은 `ListItemReader<String>`다. Step 실행마다 reader 인스턴스를 새로 만들어 반복 실행 시 첫 실행 이후 데이터가 비는 문제를 피한다.
 
 Spring Batch 메타데이터 테이블은 Flyway V3에서 생성한다.
+
+현재 실제 실행 Job bean은 `integrationJob` 하나다. 인터페이스 설정의 endpoint는 동적으로 다른 Job bean을 선택하는 데 사용하지 않고, `configuredJobName` JobParameter로 전달한다. 운영 확장 시 endpoint를 JobRegistry 기반 job name 선택으로 연결할 수 있다.
 
 ### 7.5 REST
 
@@ -398,6 +524,8 @@ Spring Batch 메타데이터 테이블은 Flyway V3에서 생성한다.
 현재 REST 어댑터는 `WebClient.block()`이나 localhost self-call을 사용하지 않는다. `LegacyRestService.echo()`를 직접 호출한다.
 
 이 구조는 로컬 데모에서 서블릿 스레드가 자기 자신을 다시 호출해 고갈되는 문제를 피하기 위한 선택이다.
+
+`AdapterExecutionConfig.endpoint`가 전달되면 실제 외부 REST URL 호출 대신 현재 내부 legacy 호출 대상 식별값으로 로그와 결과 메시지에 포함한다. 운영 확장 시 이 값을 `RestClient` 또는 `WebClient`의 요청 URL로 사용할 수 있다.
 
 ---
 
@@ -503,6 +631,14 @@ Spring Batch는 `spring.batch.job.enabled=false`로 자동 실행을 끈다.
 
 `V4__remove_duplicate_request_id_index.sql`는 `request_id UNIQUE`와 중복되는 인덱스를 제거한다.
 
+`V5__create_interface_configs.sql`는 인터페이스 등록/설정 테이블을 생성하고 기본 프로토콜 설정을 seed한다.
+
+| 테이블 | 목적 |
+| --- | --- |
+| `interface_configs` | 프로토콜별 인터페이스 이름, endpoint, enabled, timeoutMs, description 관리 |
+
+기본 seed 데이터는 SOAP, Kafka, SFTP, Batch, REST 5개 프로토콜의 데모 설정을 포함한다. 이 설정은 `/api/interfaces`와 웹 콘솔에서 조회/수정할 수 있으며, `IntegrationService`가 실행 전에 조회한다.
+
 ### 11.3 JPA 설정
 
 운영 profile 기본값은 다음 정책을 사용한다.
@@ -602,6 +738,96 @@ GET /api/logs?protocol=SFTP&limit=10&offset=0
 }
 ```
 
+### 12.4 POST /api/integrate/{requestId}/retry
+
+body 없이 호출하면 원본 요청에서 `SUCCESS`가 아닌 프로토콜만 자동으로 재처리한다.
+
+```bash
+POST /api/integrate/550e8400-e29b-41d4-a716-446655440000/retry
+```
+
+특정 프로토콜만 재처리할 수도 있다.
+
+```json
+{
+  "protocols": ["SFTP", "KAFKA"]
+}
+```
+
+응답:
+
+```json
+{
+  "originalRequestId": "550e8400-e29b-41d4-a716-446655440000",
+  "retryRequestId": "7abfdb94-f862-43a4-9a79-8abed5a23e10",
+  "retryResponse": {
+    "requestId": "7abfdb94-f862-43a4-9a79-8abed5a23e10",
+    "overallStatus": "ALL_SUCCESS",
+    "results": {},
+    "createdAt": "2026-04-26T05:10:00",
+    "completedAt": "2026-04-26T05:10:01"
+  }
+}
+```
+
+### 12.5 /api/interfaces
+
+등록 요청:
+
+```json
+{
+  "protocol": "SFTP",
+  "interfaceName": "Partner SFTP Upload",
+  "endpoint": "/upload",
+  "enabled": true,
+  "timeoutMs": 10000,
+  "description": "기관 연계 파일 업로드"
+}
+```
+
+조회/수정:
+
+```bash
+GET /api/interfaces
+GET /api/interfaces?protocol=SFTP
+PUT /api/interfaces/{id}
+```
+
+`enabled=false`로 변경하면 해당 프로토콜은 통합 요청에서 Adapter 실행 없이 `DISABLED` 결과로 저장된다.
+
+### 12.6 모니터링과 성능관리
+
+`GET /api/monitoring/summary` 응답 예시:
+
+```json
+{
+  "totalRequests": 20,
+  "processingRequests": 0,
+  "completedRequests": 20,
+  "allSuccess": 15,
+  "partialFailure": 4,
+  "allFailed": 1,
+  "totalLogs": 80,
+  "recentLogs": []
+}
+```
+
+`GET /api/performance/protocols` 응답 예시:
+
+```json
+[
+  {
+    "protocol": "SFTP",
+    "totalCount": 10,
+    "successCount": 9,
+    "failedCount": 1,
+    "timeoutCount": 0,
+    "successRate": 90.0,
+    "averageExecutionTimeMs": 120.5
+  }
+]
+```
+
 ---
 
 ## 13. 테스트 전략
@@ -612,7 +838,11 @@ GET /api/logs?protocol=SFTP&limit=10&offset=0
 
 - `IntegrationControllerTest`
 - `IntegrationServiceTest`
+- `InterfaceConfigControllerTest`
+- `InterfaceConfigServiceTest`
 - `KafkaConsumerServiceTest`
+- `MonitoringControllerTest`
+- `MonitoringServiceTest`
 - `IntegrationExecutorConfigTest`
 - `BatchAdapterServiceTest`
 - `KafkaAdapterServiceTest`
@@ -625,6 +855,10 @@ GET /api/logs?protocol=SFTP&limit=10&offset=0
 - overallStatus 계산
 - ProtocolResult 중앙 저장
 - lifecycle SystemLog 저장
+- enabled=false 프로토콜 Adapter 실행 생략
+- 인터페이스 설정값 Adapter 전달
+- 재처리 대상 프로토콜 선택
+- 모니터링/성능 통계 계산
 - Kafka 메시지 포맷과 consumer parsing
 - Batch JobParameters
 - Executor thread name
@@ -746,10 +980,11 @@ ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
 | 인증/권한 | 없음 | Spring Security, 관리자 권한, 요청자별 접근 제어 |
 | CORS | `CORS_ALLOWED_ORIGINS` 환경변수 지원 | 실제 프론트엔드 도메인만 허용 |
 | SFTP 비밀번호 | 환경변수 override 지원, 기본값 있음 | Secret Manager 또는 배포 환경변수로 강제 |
-| 외부 SOAP/REST | 내부 legacy service 직접 호출 | 외부 endpoint, timeout, 인증서, 장애 격리 설정 |
-| 재처리 | 미구현 | 실패 프로토콜 단위 retry API |
+| 외부 SOAP/REST | 내부 legacy service 직접 호출, endpoint는 식별값으로 반영 | 외부 endpoint 실제 호출, timeout, 인증서, 장애 격리 설정 |
+| 인터페이스 설정 | enabled, endpoint, timeoutMs 실행 반영 | 인증 방식, headers, retry count, SLA, 담당자 정보 확장 |
+| 재처리 | 실패 프로토콜 단위 retry API 구현 | 재처리 이력 관계 테이블, 횟수 제한, 사유/작업자 기록 |
 | 알림 | 미구현 | 실패/timeout 기준 Slack, Email, SMS 알림 |
-| 관측성 | 로그 중심 | metric, trace, dashboard 추가 |
+| 관측성 | 로그, 요약 모니터링, 프로토콜별 성능 통계 | Micrometer, trace, Grafana dashboard, p95/p99 지표 |
 | 부하 제어 | fixed thread pool 10 | 요청량 기준 queue, rejection policy, rate limit 검토 |
 
 ---
@@ -761,9 +996,12 @@ ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
 1. `ProtocolType` enum에 값 추가
 2. `IntegrationController.SUPPORTED_PROTOCOLS`에 값 추가
 3. `ProtocolAdapter` 구현체 추가
-4. `IntegrationService.processIntegration()`에 future 등록 로직 추가
-5. `ProtocolResult` 저장과 `SystemLog` 저장이 중앙 흐름에 들어오는지 확인
-6. unit test, integration test, 필요 시 Docker E2E test 추가
+4. 필요하면 `AdapterExecutionConfig`의 endpoint/timeout 해석 규칙 정의
+5. `IntegrationService.processIntegration()`에 설정 조회와 future 등록 로직 추가
+6. `InterfaceConfig` seed migration 또는 운영 등록 절차 추가
+7. `MonitoringService.getProtocolPerformance()`에서 통계 대상에 포함되는지 확인
+8. `ProtocolResult` 저장과 `SystemLog` 저장이 중앙 흐름에 들어오는지 확인
+9. unit test, integration test, 필요 시 Docker E2E test 추가
 
 DB 스키마를 바꿀 때:
 
