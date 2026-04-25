@@ -3,6 +3,7 @@ package com.finbridge.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.model.dto.IntegrationRequestDTO;
 import com.finbridge.model.dto.IntegrationResponseDTO;
+import com.finbridge.model.dto.LogResponseDTO;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.entity.IntegrationRequest;
 import com.finbridge.model.entity.ProtocolResult;
@@ -22,7 +23,12 @@ import com.finbridge.service.adapter.SftpAdapterService;
 import com.finbridge.service.adapter.SoapAdapterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.AbstractPageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -34,6 +40,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -51,6 +58,13 @@ public class IntegrationService {
     private final ObjectMapper objectMapper;
     private final ExecutorService integrationTaskExecutor;
 
+    /**
+     * @Transactional: 요청 저장부터 완료 저장까지 하나의 트랜잭션으로 묶는다.
+     * 주의: 어댑터 실행(최대 35초) 동안 DB 커넥션을 점유하므로
+     * 고트래픽 환경에서는 커넥션 풀 고갈 가능성 있음.
+     * (프로토타입 수준에서는 허용)
+     */
+    @Transactional
     public IntegrationResponseDTO processIntegration(IntegrationRequestDTO request) {
         // [1] request_id 생성
         String requestId = UUID.randomUUID().toString();
@@ -151,9 +165,10 @@ public class IntegrationService {
                 "통합 요청 완료: " + overallStatus);
 
         log.info("[INTEGRATION] {} 완료: {}", requestId, overallStatus);
-        return new IntegrationResponseDTO(requestId, overallStatus, results, LocalDateTime.now());
+        return new IntegrationResponseDTO(requestId, overallStatus, results, entity.getCreatedAt());
     }
 
+    @Transactional(readOnly = true)
     public Optional<IntegrationResponseDTO> getStatus(String requestId) {
         Optional<IntegrationRequest> entityOptional = integrationRequestRepository.findByRequestId(requestId);
         if (entityOptional.isEmpty()) {
@@ -216,5 +231,72 @@ public class IntegrationService {
         log.setEventType(eventType);
         log.setEventDetail(detail);
         systemLogRepository.save(log);
+    }
+
+    @Transactional(readOnly = true)
+    public LogResponseDTO getLogs(ProtocolType protocolType, int limit, int offset) {
+        Pageable pageable = new OffsetBasedPageRequest(
+                offset, limit, Sort.by("timestamp").descending());
+
+        Page<SystemLog> page = protocolType != null
+                ? systemLogRepository.findByProtocol(protocolType, pageable)
+                : systemLogRepository.findAll(pageable);
+
+        List<LogResponseDTO.LogItem> logItems = page.getContent().stream()
+                .map(l -> new LogResponseDTO.LogItem(
+                        l.getId(),
+                        l.getRequestId(),
+                        l.getProtocol() != null ? l.getProtocol().name() : null,
+                        l.getEventType().name(),
+                        l.getEventDetail(),
+                        l.getTimestamp()
+                ))
+                .collect(Collectors.toList());
+
+        return new LogResponseDTO(page.getTotalElements(), limit, offset, logItems);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Offset-based pagination (서비스 내부에서만 사용)
+    // ─────────────────────────────────────────────────────────────────────
+
+    private static class OffsetBasedPageRequest extends AbstractPageRequest {
+
+        private final long offset;
+        private final Sort sort;
+
+        private OffsetBasedPageRequest(long offset, int limit, Sort sort) {
+            super((int) (offset / limit), limit);
+            if (offset < 0) {
+                throw new IllegalArgumentException("Offset must not be negative");
+            }
+            this.offset = offset;
+            this.sort = sort;
+        }
+
+        @Override public long getOffset() { return offset; }
+        @Override public Sort getSort()   { return sort; }
+
+        @Override
+        public Pageable next() {
+            return new OffsetBasedPageRequest(offset + getPageSize(), getPageSize(), sort);
+        }
+
+        @Override
+        public Pageable previous() {
+            return hasPrevious()
+                    ? new OffsetBasedPageRequest(offset - getPageSize(), getPageSize(), sort)
+                    : this;
+        }
+
+        @Override
+        public Pageable first() {
+            return new OffsetBasedPageRequest(0, getPageSize(), sort);
+        }
+
+        @Override
+        public Pageable withPage(int pageNumber) {
+            return new OffsetBasedPageRequest((long) pageNumber * getPageSize(), getPageSize(), sort);
+        }
     }
 }

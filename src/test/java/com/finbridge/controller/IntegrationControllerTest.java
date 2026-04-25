@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.finbridge.model.dto.IntegrationResponseDTO;
+import com.finbridge.model.dto.LogResponseDTO;
 import com.finbridge.model.enums.OverallStatus;
 import com.finbridge.model.enums.ProtocolType;
-import com.finbridge.repository.SystemLogRepository;
 import com.finbridge.service.IntegrationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,8 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -40,9 +38,6 @@ class IntegrationControllerTest {
 
     @Mock
     private IntegrationService integrationService;
-
-    @Mock
-    private SystemLogRepository systemLogRepository;
 
     @InjectMocks
     private IntegrationController controller;
@@ -229,8 +224,8 @@ class IntegrationControllerTest {
         @Test
         @DisplayName("파라미터 없이 호출하면 200과 빈 logs 배열을 반환한다")
         void defaultParams_returns200WithEmptyList() throws Exception {
-            when(systemLogRepository.findAll(any(Pageable.class)))
-                    .thenReturn(new PageImpl<>(List.of()));
+            when(integrationService.getLogs(null, 50, 0))
+                    .thenReturn(new LogResponseDTO(0L, 50, 0, List.of()));
 
             mockMvc.perform(get("/api/logs"))
                     .andExpect(status().isOk())
@@ -243,8 +238,8 @@ class IntegrationControllerTest {
         @Test
         @DisplayName("유효한 protocol 파라미터로 조회하면 200을 반환한다")
         void validProtocol_returns200() throws Exception {
-            when(systemLogRepository.findByProtocol(eq(ProtocolType.SOAP), any(Pageable.class)))
-                    .thenReturn(new PageImpl<>(List.of()));
+            when(integrationService.getLogs(ProtocolType.SOAP, 50, 0))
+                    .thenReturn(new LogResponseDTO(0L, 50, 0, List.of()));
 
             mockMvc.perform(get("/api/logs").param("protocol", "SOAP"))
                     .andExpect(status().isOk())
@@ -254,8 +249,8 @@ class IntegrationControllerTest {
         @Test
         @DisplayName("소문자 protocol 파라미터도 대소문자 정규화 후 200을 반환한다")
         void lowercaseProtocol_returns200() throws Exception {
-            when(systemLogRepository.findByProtocol(eq(ProtocolType.KAFKA), any(Pageable.class)))
-                    .thenReturn(new PageImpl<>(List.of()));
+            when(integrationService.getLogs(ProtocolType.KAFKA, 50, 0))
+                    .thenReturn(new LogResponseDTO(0L, 50, 0, List.of()));
 
             mockMvc.perform(get("/api/logs").param("protocol", "kafka"))
                     .andExpect(status().isOk());
@@ -264,8 +259,8 @@ class IntegrationControllerTest {
         @Test
         @DisplayName("limit과 offset을 지정하면 응답에 그 값이 반영된다")
         void customLimitOffset_reflectedInResponse() throws Exception {
-            when(systemLogRepository.findAll(any(Pageable.class)))
-                    .thenReturn(new PageImpl<>(List.of()));
+            when(integrationService.getLogs(null, 10, 20))
+                    .thenReturn(new LogResponseDTO(0L, 10, 20, List.of()));
 
             mockMvc.perform(get("/api/logs").param("limit", "10").param("offset", "20"))
                     .andExpect(status().isOk())
