@@ -376,6 +376,19 @@ input, textarea, select { font-family: var(--font); font-size: 13px; }
   cursor: pointer;
 }
 .copy-btn:hover { background: var(--bg3); }
+.retry-btn {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 11px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 3px;
+  color: var(--warning);
+  cursor: pointer;
+  font-weight: 600;
+}
+.retry-btn:hover { filter: brightness(.98); }
+.retry-btn:disabled { opacity: .55; cursor: not-allowed; }
 
 /* ── Results table ───────────────────────────────────────── */
 .results-table {
@@ -546,16 +559,107 @@ input, textarea, select { font-family: var(--font); font-size: 13px; }
 /* ── Timestamp footer ────────────────────────────────────── */
 .ts-footer { font-size: 11px; color: var(--text3); margin-top: 8px; }
 
+/* ── Monitoring / performance ───────────────────────────── */
+.ops-section {
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: 0 16px 16px;
+}
+.ops-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.metric-tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg3);
+  padding: 10px;
+  min-height: 62px;
+}
+.metric-label {
+  color: var(--text3);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.metric-value {
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  font-family: var(--mono);
+}
+.perf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.perf-table th {
+  padding: 7px 10px;
+  text-align: left;
+  color: var(--text3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.perf-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.perf-table tr:last-child td { border-bottom: none; }
+.rate-bar {
+  display: grid;
+  grid-template-columns: 1fr 46px;
+  align-items: center;
+  gap: 8px;
+}
+.rate-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.rate-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+.rate-text {
+  font-family: var(--mono);
+  color: var(--text2);
+  font-size: 11px;
+  text-align: right;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 960px) {
   .console-grid { grid-template-columns: 1fr; }
+  .ops-grid { grid-template-columns: 1fr; }
   .id-lookup { flex-wrap: wrap; }
   .id-input { width: 100%; }
   .topbar-indicators .svc-badge:not(:first-child) { display: none; }
 }
 @media (max-width: 640px) {
   .console-grid { padding: 10px; gap: 10px; }
+  .ops-section { padding: 0 10px 10px; }
   .logs-section { padding: 0 10px 20px; }
+  .metric-grid { grid-template-columns: 1fr; }
+  .perf-table th:nth-child(3),
+  .perf-table td:nth-child(3),
+  .perf-table th:nth-child(4),
+  .perf-table td:nth-child(4) { display: none; }
   .results-table th:nth-child(3),
   .results-table td:nth-child(3),
   .results-table th:nth-child(4),
@@ -695,6 +799,59 @@ input, textarea, select { font-family: var(--font); font-size: 13px; }
   </div>
 
 </div><!-- /console-grid -->
+
+<!-- ═══════════════════════ MONITORING / PERFORMANCE ════════════ -->
+<div class="ops-section">
+  <div class="ops-grid">
+    <div class="card">
+      <div class="card-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2">
+          <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+        </svg>
+        <span class="card-title">모니터링</span>
+        <button class="btn btn-ghost" id="monitoringFetchBtn" onclick="fetchMonitoring()" style="padding:5px 10px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+          </svg>
+          새로고침
+        </button>
+      </div>
+      <div class="card-body">
+        <div id="monitoringError" class="error-alert" style="margin-bottom:8px"></div>
+        <div class="metric-grid" id="summaryGrid">
+          <div class="metric-tile"><div class="metric-label">전체 요청</div><div class="metric-value">—</div></div>
+          <div class="metric-tile"><div class="metric-label">처리 중</div><div class="metric-value">—</div></div>
+          <div class="metric-tile"><div class="metric-label">완료</div><div class="metric-value">—</div></div>
+          <div class="metric-tile"><div class="metric-label">전체 로그</div><div class="metric-value">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2">
+          <path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>
+        </svg>
+        <span class="card-title">성능관리</span>
+        <span class="total-badge" id="performanceUpdatedBadge"></span>
+      </div>
+      <div class="card-body">
+        <table class="perf-table">
+          <thead><tr>
+            <th>프로토콜</th>
+            <th>성공률</th>
+            <th>평균 소요</th>
+            <th>성공/실패/타임아웃</th>
+            <th>전체</th>
+          </tr></thead>
+          <tbody id="performanceTableBody">
+            <tr><td colspan="5" class="logs-empty">성능 데이터를 불러오는 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════════ LOGS (always visible) ══════════════ -->
 <div class="logs-section">
@@ -851,6 +1008,7 @@ function renderResultBody(data) {
       <span style="color:var(--text2)">RequestId</span>
       <span class="request-id-val" id="lastRequestId">${esc(data.requestId)}</span>
       <button class="copy-btn" onclick="copyId('${esc(data.requestId)}')">복사</button>
+      <button class="retry-btn" id="retryBtn" onclick="retryFailedProtocols('${esc(data.requestId)}')">실패 재처리</button>
     </div>
     <div class="divider"></div>
     <table class="results-table">
@@ -870,6 +1028,81 @@ function showResult(data) {
   body.style.display = 'block';
   body.innerHTML = renderResultBody(data);
 }
+
+// ── Monitoring / performance ──────────────────────────────────────────────
+function renderSummary(data) {
+  const items = [
+    ['전체 요청', data.totalRequests],
+    ['처리 중', data.processingRequests],
+    ['완료', data.completedRequests],
+    ['전체 로그', data.totalLogs],
+    ['ALL_SUCCESS', data.allSuccess],
+    ['PARTIAL_FAILURE', data.partialFailure],
+    ['ALL_FAILED', data.allFailed],
+    ['최근 로그', data.recentLogs ? data.recentLogs.length : 0],
+  ];
+
+  document.getElementById('summaryGrid').innerHTML = items.map(([label, value]) => `
+    <div class="metric-tile">
+      <div class="metric-label">${esc(label)}</div>
+      <div class="metric-value">${Number(value || 0).toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+function renderPerformance(rows) {
+  const tbody = document.getElementById('performanceTableBody');
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="logs-empty">성능 데이터가 없습니다.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const rate = Number(r.successRate || 0);
+    const safeRate = Math.max(0, Math.min(100, rate));
+    return `<tr>
+      <td><span class="proto-cell" data-p="${esc(r.protocol)}">${esc(r.protocol)}</span></td>
+      <td>
+        <div class="rate-bar">
+          <div class="rate-track"><div class="rate-fill" style="width:${safeRate}%"></div></div>
+          <span class="rate-text">${safeRate.toFixed(1)}%</span>
+        </div>
+      </td>
+      <td class="exec-time">${Number(r.averageExecutionTimeMs || 0).toFixed(1)} ms</td>
+      <td class="exec-time">${r.successCount || 0} / ${r.failedCount || 0} / ${r.timeoutCount || 0}</td>
+      <td class="exec-time">${r.totalCount || 0}</td>
+    </tr>`;
+  }).join('');
+}
+
+window.fetchMonitoring = async function() {
+  const btn = document.getElementById('monitoringFetchBtn');
+  const errEl = document.getElementById('monitoringError');
+  hideError(errEl);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">↻</span> 조회 중...';
+
+  try {
+    const [summaryRes, perfRes] = await Promise.all([
+      fetch(`${BASE}/api/monitoring/summary`),
+      fetch(`${BASE}/api/performance/protocols`),
+    ]);
+
+    if (!summaryRes.ok) throw new Error(`/api/monitoring/summary HTTP ${summaryRes.status}`);
+    if (!perfRes.ok) throw new Error(`/api/performance/protocols HTTP ${perfRes.status}`);
+
+    renderSummary(await summaryRes.json());
+    renderPerformance(await perfRes.json());
+    document.getElementById('performanceUpdatedBadge').textContent = `— ${fmtTs(new Date().toISOString())}`;
+  } catch (e) {
+    showError(errEl, '모니터링 조회 실패: ' + e.message);
+    document.getElementById('performanceTableBody').innerHTML =
+      `<tr><td colspan="5" class="logs-empty">성능 데이터를 불러올 수 없습니다.</td></tr>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> 새로고침';
+  }
+};
 
 // ── Copy request ID ────────────────────────────────────────────────────────
 window.copyId = function(id) {
@@ -914,6 +1147,7 @@ window.sendIntegrate = async function() {
     document.getElementById('requestIdInput').value = data.requestId;
     // refresh logs
     fetchLogs();
+    fetchMonitoring();
   } catch (e) {
     showError(errEl, '요청 실패: ' + e.message);
   } finally {
@@ -953,6 +1187,41 @@ window.fetchStatus = async function() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> 조회';
+  }
+};
+
+// ── POST /api/integrate/{requestId}/retry ─────────────────────────────────
+window.retryFailedProtocols = async function(id) {
+  const errEl = document.getElementById('statusError');
+  const btn   = document.getElementById('retryBtn');
+
+  if (!id) { showError(errEl, 'RequestId를 확인할 수 없습니다.'); return; }
+  hideError(errEl);
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin">↻</span> 재처리 중...';
+  }
+
+  try {
+    const r = await fetch(`${BASE}/api/integrate/${encodeURIComponent(id)}/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (r.status === 404) { showError(errEl, `"${id}" 를 찾을 수 없습니다.`); return; }
+    if (!r.ok) { showError(errEl, `HTTP ${r.status}: ${await r.text()}`); return; }
+
+    const data = await r.json();
+    showResult(data.retryResponse);
+    document.getElementById('requestIdInput').value = data.retryRequestId;
+    fetchLogs();
+    fetchMonitoring();
+  } catch (e) {
+    showError(errEl, '재처리 실패: ' + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '실패 재처리';
+    }
   }
 };
 
@@ -1074,6 +1343,7 @@ window.runSeed = async function() {
     } catch { /* ignore */ }
   }
   fetchLogs();
+  fetchMonitoring();
   btn.innerHTML = `✓ ${ok}/${SEED_SCENARIOS.length}건 전송됨`;
   setTimeout(() => {
     btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M2 12h20"/></svg> 샘플 요청 5건 실행<span class="btn-seed-note"> · Kafka/SFTP/Batch 실행됨</span>';
@@ -1082,6 +1352,7 @@ window.runSeed = async function() {
 };
 
 // ── Auto-load logs on page load ────────────────────────────────────────────
+fetchMonitoring();
 fetchLogs();
 </script>
 </body>

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.LogResponseDTO;
+import com.finbridge.model.dto.RetryResponseDTO;
 import com.finbridge.model.enums.OverallStatus;
 import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.service.IntegrationService;
@@ -182,6 +183,79 @@ class IntegrationControllerTest {
 
             mockMvc.perform(get("/api/integrate/does-not-exist"))
                     .andExpect(status().isNotFound());
+        }
+    }
+
+    // =========================================================================
+    // POST /api/integrate/{requestId}/retry
+    // =========================================================================
+
+    @Nested
+    @DisplayName("POST /api/integrate/{requestId}/retry")
+    class Retry {
+
+        @Test
+        @DisplayName("유효한 프로토콜을 지정하면 200과 새 retryRequestId를 반환한다")
+        void explicitProtocols_returns200() throws Exception {
+            IntegrationResponseDTO retryResponse = new IntegrationResponseDTO(
+                    "retry-1", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now(), LocalDateTime.now());
+            RetryResponseDTO dto = new RetryResponseDTO("origin-1", "retry-1", retryResponse);
+
+            when(integrationService.retryIntegration(eq("origin-1"), eq(List.of("REST"))))
+                    .thenReturn(Optional.of(dto));
+
+            mockMvc.perform(post("/api/integrate/origin-1/retry")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"protocols\":[\"rest\"]}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.originalRequestId").value("origin-1"))
+                    .andExpect(jsonPath("$.retryRequestId").value("retry-1"));
+        }
+
+        @Test
+        @DisplayName("body를 생략하면 실패 프로토콜 자동 재처리를 요청한다")
+        void noBody_returns200() throws Exception {
+            IntegrationResponseDTO retryResponse = new IntegrationResponseDTO(
+                    "retry-2", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now(), LocalDateTime.now());
+            RetryResponseDTO dto = new RetryResponseDTO("origin-2", "retry-2", retryResponse);
+
+            when(integrationService.retryIntegration("origin-2", null))
+                    .thenReturn(Optional.of(dto));
+
+            mockMvc.perform(post("/api/integrate/origin-2/retry"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.retryRequestId").value("retry-2"));
+        }
+
+        @Test
+        @DisplayName("지원하지 않는 프로토콜이면 400을 반환한다")
+        void invalidProtocol_returns400() throws Exception {
+            mockMvc.perform(post("/api/integrate/origin-1/retry")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"protocols\":[\"GRPC\"]}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("원본 requestId가 없으면 404를 반환한다")
+        void originalNotFound_returns404() throws Exception {
+            when(integrationService.retryIntegration(eq("missing"), eq(List.of("REST"))))
+                    .thenReturn(Optional.empty());
+
+            mockMvc.perform(post("/api/integrate/missing/retry")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"protocols\":[\"REST\"]}"))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("재처리 대상 프로토콜이 없으면 400을 반환한다")
+        void noRetryTarget_returns400() throws Exception {
+            when(integrationService.retryIntegration("origin-3", null))
+                    .thenThrow(new IllegalArgumentException("재처리할 프로토콜이 없습니다."));
+
+            mockMvc.perform(post("/api/integrate/origin-3/retry"))
+                    .andExpect(status().isBadRequest());
         }
     }
 
