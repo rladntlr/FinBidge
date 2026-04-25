@@ -1,450 +1,780 @@
-# 개발 가이드: 금융 IT 인터페이스 통합관리 시스템
+# FinBridge 개발문서
 
-**버전:** 2.0 (Kafka + MySQL + Flyway)  
-**작성일:** 2026-04-24  
-**마감:** 2026-04-27 자정
+**문서 목적:** FinBridge 코드를 이해하고 유지보수하기 위한 내부 개발 문서  
+**작성 기준:** 현재 브랜치의 최신 구현  
+**대상 독자:** 백엔드 개발자, 리뷰어, 포트폴리오 평가자
 
 ---
 
-## 빠른 시작 (5분)
+## 1. 시스템 개요
 
-```bash
-# 1. 프로젝트 빌드
-gradle clean build
+FinBridge는 금융 IT 인터페이스 통합관리 시스템이다.
 
-# 2. MySQL + Kafka 실행 (Docker)
-docker-compose up -d
+클라이언트가 `POST /api/integrate`로 통합 요청을 보내면, 서버는 요청된 프로토콜을 확인한 뒤 SOAP, Kafka, SFTP, Batch, REST 어댑터를 병렬로 실행한다. 각 어댑터는 실행 결과만 DTO로 반환하고, 최종 `ProtocolResult` 저장과 `SystemLog` 저장은 `IntegrationService`가 중앙에서 처리한다.
 
-# 3. Flyway 마이그레이션 자동 실행 (Spring Boot 시작 시)
-gradle bootRun
+핵심 흐름은 다음과 같다.
 
-# 4. 브라우저에서 접속
-http://localhost:8080
+```text
+Client
+  |
+  v
+IntegrationController
+  |
+  | 1. protocol validation
+  v
+IntegrationService
+  |
+  | 2. requestId 생성, IntegrationRequest 저장, INITIATED 로그 저장
+  |
+  | 3. CompletableFuture + integrationTaskExecutor로 어댑터 병렬 실행
+  |
+  +--> SoapAdapterService  -> LegacySoapService
+  +--> KafkaAdapterService -> Kafka topic publish
+  +--> SftpAdapterService  -> SFTP upload
+  +--> BatchAdapterService -> Spring Batch JobLauncher
+  +--> RestAdapterService  -> LegacyRestService
+  |
+  | 4. 35초 timeout 기준으로 결과 수집
+  |
+  | 5. ProtocolResult 저장, SystemLog 저장, overallStatus 계산
+  v
+IntegrationResponseDTO
 ```
 
 ---
 
-## 프로젝트 구조
+## 2. 패키지 구조
 
-```
-finbridge-portfolio/
-├── build.gradle                         # Gradle 의존성
-├── docker-compose.yml                   # MySQL + Kafka
-│
-├── src/main/java/com/finbridge/
-│   ├── FinbridgeApplication.java        # Spring Boot 진입점
-│   │
-│   ├── controller/
-│   │   └── IntegrationController.java   # REST API 엔드포인트
-│   │
-│   ├── service/
-│   │   ├── IntegrationService.java      # 통합 오케스트레이션
-│   │   ├── SoapAdapterService.java      # SOAP (Apache CXF)
-│   │   ├── SftpAdapterService.java      # SFTP (JSch)
-│   │   ├── BatchAdapterService.java     # Batch (Spring Batch)
-│   │   └── KafkaService.java            # Kafka 메시지 처리
-│   │
-│   ├── model/
+```text
+src/main/java/com/finbridge
+├── FinbridgeApplication.java
+├── config
+│   ├── AppConfig.java
+│   ├── BatchJobConfig.java
+│   ├── IntegrationExecutorConfig.java
+│   ├── KafkaConfig.java
+│   ├── SoapConfig.java
+│   └── WebConfig.java
+├── controller
+│   └── IntegrationController.java
+├── model
+│   ├── dto
+│   │   ├── IntegrationRequestDTO.java
+│   │   ├── IntegrationResponseDTO.java
+│   │   ├── LogResponseDTO.java
+│   │   └── ProtocolResultDTO.java
+│   ├── entity
 │   │   ├── IntegrationRequest.java
-│   │   ├── IntegrationResponse.java
 │   │   ├── ProtocolResult.java
 │   │   └── SystemLog.java
-│   │
-│   ├── config/
-│   │   ├── KafkaConfig.java             # Kafka 설정
-│   │   ├── BatchConfig.java             # Spring Batch 설정
-│   │   └── WebConfig.java
-│   │
-│   └── repository/
-│       └── SystemLogRepository.java
-│
-├── src/main/resources/
-│   ├── application.yml                  # Spring 설정
-│   ├── db/migration/                    # Flyway 마이그레이션
-│   │   ├── V1__init.sql
-│   │   └── V2__add_indexes.sql
-│   ├── templates/
-│   │   └── index.html
-│   └── static/
-│       └── style.css
-│
-├── src/test/java/
-│   └── IntegrationTest.java
-│
-└── docker-compose.yml
+│   └── enums
+│       ├── EventType.java
+│       ├── OverallStatus.java
+│       ├── ProtocolType.java
+│       ├── RequestStatus.java
+│       └── ResultStatus.java
+├── repository
+│   ├── IntegrationRequestRepository.java
+│   ├── ProtocolResultRepository.java
+│   └── SystemLogRepository.java
+├── service
+│   ├── IntegrationService.java
+│   ├── KafkaConsumerService.java
+│   ├── adapter
+│   │   ├── BatchAdapterService.java
+│   │   ├── KafkaAdapterService.java
+│   │   ├── ProtocolAdapter.java
+│   │   ├── RestAdapterService.java
+│   │   ├── SftpAdapterService.java
+│   │   └── SoapAdapterService.java
+│   └── legacy
+│       ├── LegacyRestService.java
+│       └── LegacySoapService.java
+└── soap
+    ├── IntegrationSoapRequest.java
+    ├── IntegrationSoapResponse.java
+    ├── SoapEndpoint.java
+    └── package-info.java
 ```
+
+### 주요 책임
+
+| 영역 | 책임 |
+| --- | --- |
+| `controller` | API 요청 검증, 응답 상태 코드 결정 |
+| `service.IntegrationService` | 통합 요청 생명주기, 병렬 실행, 결과 저장, 로그 저장 |
+| `service.adapter` | 프로토콜별 실행 로직 |
+| `service.legacy` | 로컬 데모용 REST/SOAP 레거시 처리 |
+| `config` | Kafka, Batch, SOAP, CORS, Executor 설정 |
+| `repository` | JPA 기반 DB 접근 |
+| `model.entity` | DB 테이블 매핑 |
+| `model.dto` | API 요청/응답 모델 |
 
 ---
 
-## build.gradle 의존성
+## 3. 요청 처리 흐름
 
-```gradle
-dependencies {
-    // Spring Boot
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-    
-    // Kafka
-    implementation 'org.springframework.kafka:spring-kafka'
-    
-    // Spring Batch
-    implementation 'org.springframework.boot:spring-boot-starter-batch'
-    
-    // MySQL + Flyway
-    runtimeOnly 'com.mysql:mysql-connector-j'
-    implementation 'org.flywaydb:flyway-core'
-    implementation 'org.flywaydb:flyway-mysql'
-    
-    // SOAP (Apache CXF)
-    implementation 'org.apache.cxf:cxf-spring-boot-starter-jaxws:4.0.0'
-    
-    // SFTP (JSch)
-    implementation 'com.jcraft:jsch:0.1.55'
-    
-    // Lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-    
-    // Test
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.kafka:spring-kafka-test'
+### 3.1 POST /api/integrate
+
+진입점은 `IntegrationController.integrate()`이다.
+
+처리 단계:
+
+1. `protocols`가 null 또는 empty인지 검사한다.
+2. 각 프로토콜 문자열을 trim 후 uppercase로 정규화한다.
+3. null, blank, 미지원 프로토콜이 있으면 400 Bad Request를 반환한다.
+4. 정상 요청이면 `IntegrationService.processIntegration()`을 호출한다.
+
+지원 프로토콜:
+
+```text
+SOAP, KAFKA, SFTP, BATCH, REST
+```
+
+소문자 요청은 정상화된다.
+
+```json
+{
+  "protocols": ["rest", "sftp"],
+  "payload": {
+    "customerId": "C-1001"
+  }
 }
 ```
 
+위 요청은 내부적으로 `REST`, `SFTP`로 변환된다.
+
+### 3.2 IntegrationService.processIntegration()
+
+`processIntegration()`은 전체 오케스트레이션을 담당한다.
+
+중요한 점은 이 메서드 전체에 `@Transactional`을 사용하지 않는다는 것이다. 외부 시스템 호출이 포함된 병렬 실행 구간에서 DB 트랜잭션과 커넥션을 오래 잡지 않기 위해서다.
+
+처리 순서:
+
+1. UUID 기반 `requestId` 생성
+2. `createInitialRequest()` 호출
+   - `integration_requests` 저장
+   - `INITIATED` 시스템 로그 저장
+   - 요청 상태를 `PROCESSING`으로 변경
+3. 요청된 프로토콜별 `CompletableFuture` 생성
+4. `integrationTaskExecutor`로 어댑터 병렬 실행
+5. `CompletableFuture.allOf(...).orTimeout(35, TimeUnit.SECONDS)`로 최대 35초 대기
+6. 완료된 결과를 `ProtocolResultDTO`로 수집
+7. timeout 또는 예외는 실패 결과로 변환
+8. `determineOverallStatus()`로 전체 상태 계산
+9. `saveFinalResults()` 호출
+   - 프로토콜별 `ProtocolResult` 저장
+   - 프로토콜별 `SystemLog` 저장
+   - `integration_requests`를 `COMPLETED`로 변경
+   - 최종 완료 로그 저장
+10. `IntegrationResponseDTO` 반환
+
+### 3.3 GET /api/integrate/{requestId}
+
+`IntegrationController.getStatus()`가 `IntegrationService.getStatus()`를 호출한다.
+
+조회 흐름:
+
+1. `IntegrationRequestRepository.findByRequestId(requestId)`로 요청 조회
+2. 없으면 404 Not Found
+3. 있으면 `ProtocolResultRepository.findByRequestId(requestId)`로 프로토콜 결과 조회
+4. `IntegrationResponseDTO`로 반환
+
+### 3.4 GET /api/logs
+
+`IntegrationController.getLogs()`에서 limit, offset, protocol query parameter를 검증한다.
+
+검증 규칙:
+
+- `limit <= 0`이면 400
+- `offset < 0`이면 400
+- 잘못된 `protocol`이면 400
+- protocol은 소문자 입력도 uppercase 정규화 후 처리
+
+서비스는 `OffsetBasedPageRequest`로 offset 기반 페이지네이션을 구성한다.
+
 ---
 
-## application.yml 설정
+## 4. 병렬 처리 구조
+
+### 4.1 CompletableFuture
+
+프로토콜별 어댑터는 `CompletableFuture.supplyAsync()`로 실행된다.
+
+예시:
+
+```java
+futures.put("SFTP", CompletableFuture.supplyAsync(
+        () -> sftpAdapterService.execute(requestId, request.getPayload()),
+        integrationTaskExecutor));
+```
+
+요청에 포함된 프로토콜만 future에 추가된다.
+
+### 4.2 integrationTaskExecutor
+
+`IntegrationExecutorConfig`에서 별도 ExecutorService를 등록한다.
+
+```java
+return Executors.newFixedThreadPool(10, threadFactory);
+```
+
+스레드 이름은 `integration-adapter-1`, `integration-adapter-2` 형식이다. 장애 분석 시 스레드 덤프에서 통합 어댑터 작업을 구분하기 쉽다.
+
+### 4.3 35초 timeout
+
+`CompletableFuture.allOf(...).orTimeout(35, TimeUnit.SECONDS)`를 사용한다.
+
+동작:
+
+- 모든 future가 35초 안에 끝나면 각 결과를 수집한다.
+- 아직 끝나지 않은 future는 `TIMEOUT`, `504`, `35초 내 응답 없음` 결과로 변환한다.
+- 이미 끝났지만 예외가 발생한 future는 `FAILED`, `500` 결과로 변환한다.
+
+이 설계는 API 응답과 DB 저장 결과를 `IntegrationService`에서 한 번만 확정하기 위한 구조다.
+
+---
+
+## 5. 트랜잭션 설계
+
+### 5.1 원칙
+
+`processIntegration()` 전체에는 `@Transactional`을 붙이지 않는다.
+
+이유:
+
+- SOAP, Kafka, SFTP, Batch, REST 실행은 외부 시스템 호출 또는 블로킹 작업이다.
+- 전체 메서드를 트랜잭션으로 묶으면 최대 35초 동안 DB 커넥션을 점유할 수 있다.
+- 동시 요청이 늘어나면 커넥션 풀 고갈 위험이 커진다.
+
+### 5.2 실제 구현
+
+짧은 DB 저장 구간만 `TransactionTemplate`으로 감싼다.
+
+| 메서드 | 트랜잭션 범위 |
+| --- | --- |
+| `createInitialRequest()` | 요청 생성, 시작 로그 저장, 상태 PROCESSING 변경 |
+| `saveFinalResults()` | 프로토콜 결과 저장, 완료 로그 저장, 상태 COMPLETED 변경 |
+| `getStatus()` | `@Transactional(readOnly = true)` |
+| `getLogs()` | `@Transactional(readOnly = true)` |
+
+외부 어댑터 실행은 트랜잭션 밖에서 수행된다.
+
+---
+
+## 6. 결과 저장 책임
+
+어댑터는 `ProtocolResultDTO`만 반환한다.
+
+DB 저장은 하지 않는다.
+
+이 책임을 `IntegrationService`에 모은 이유:
+
+- timeout 결과와 실제 어댑터 결과가 서로 다른 시점에 저장되는 문제를 막기 위해
+- 프로토콜별 최종 결과를 요청당 한 번만 저장하기 위해
+- 전체 상태 계산과 로그 저장을 같은 위치에서 관리하기 위해
+
+저장 대상:
+
+| 테이블 | 저장 시점 |
+| --- | --- |
+| `integration_requests` | 요청 시작, 최종 완료 |
+| `protocol_results` | 각 프로토콜 결과 확정 후 |
+| `system_logs` | 요청 시작, 프로토콜별 결과, 최종 완료 |
+
+---
+
+## 7. 어댑터 설계
+
+모든 어댑터는 `ProtocolAdapter` 인터페이스를 구현한다.
+
+```java
+ProtocolResultDTO execute(String requestId, Map<String, Object> payload);
+```
+
+### 7.1 SOAP
+
+파일:
+
+- `SoapAdapterService.java`
+- `LegacySoapService.java`
+- `SoapEndpoint.java`
+- `integration.xsd`
+
+현재 SOAP 어댑터는 HTTP self-call을 하지 않는다. `LegacySoapService.process()`를 직접 호출한다.
+
+처리:
+
+1. payload를 JSON 문자열로 직렬화한다.
+2. `IntegrationSoapRequest`에 `requestId`, `payload`를 담는다.
+3. `LegacySoapService`에서 처리한다.
+4. 성공 시 `SUCCESS`, `200` 결과를 반환한다.
+
+`SoapEndpoint`와 XSD는 SOAP endpoint 구조를 남겨둔 컴포넌트다. 현재 통합 흐름의 SOAP 어댑터는 직접 legacy service를 호출한다.
+
+### 7.2 Kafka
+
+파일:
+
+- `KafkaAdapterService.java`
+- `KafkaConsumerService.java`
+- `KafkaConfig.java`
+
+Producer 흐름:
+
+1. payload를 JSON으로 직렬화한다.
+2. 메시지를 `requestId|payloadJson` 형식으로 만든다.
+3. topic `integration-events`에 key=`requestId`, value=`message`로 발행한다.
+4. `future.get(5, TimeUnit.SECONDS)`로 발행 완료를 최대 5초 대기한다.
+5. 성공 시 `SUCCESS`, 실패 시 `FAILED`를 반환한다.
+
+Consumer 흐름:
+
+1. `KafkaConsumerService.consume()`이 `integration-events`를 구독한다.
+2. 메시지에서 `requestId`를 파싱한다.
+3. consumer는 DB에 `ProtocolResult`를 저장하지 않고 로그만 남긴다.
+
+DLT 처리:
+
+- DLT topic: `integration-events-dlt`
+- `DefaultErrorHandler`가 1초 간격으로 최대 3회 재시도한다.
+- 계속 실패하면 `DeadLetterPublishingRecoverer`가 DLT topic의 partition 0으로 보낸다.
+- DLT consumer는 메시지를 받고 requestId 파싱 로그만 남긴다.
+
+DLT는 dead letter topic의 약자다. 여러 번 처리에 실패한 메시지를 버리지 않고 따로 보내는 실패 보관함이다.
+
+### 7.3 SFTP
+
+파일:
+
+- `SftpAdapterService.java`
+- `application.yml`
+- `docker-compose.yml`
+- `docker/sftp/host_keys/*`
+- `docker/sftp/init.d/fix-upload-permissions.sh`
+
+처리:
+
+1. payload를 JSON으로 직렬화한다.
+2. 파일명을 `finbridge-{requestId}.json`으로 만든다.
+3. JSch session을 생성한다.
+4. `StrictHostKeyChecking=yes`이면 `known_hosts`를 등록한다.
+5. session connect timeout 10초, channel connect timeout 10초로 연결한다.
+6. `${sftp.upload-dir}` 아래에 파일을 업로드한다.
+7. finally에서 channel과 session을 disconnect한다.
+
+로컬 Docker SFTP는 host key를 repo에 고정한다. 따라서 컨테이너를 지웠다가 다시 띄워도 `[localhost]:2222` host key가 바뀌지 않는다.
+
+운영 환경에서는 repo의 데모 host key를 사용하면 안 된다. 실제 SFTP 서버의 host key를 `known_hosts`에 등록해야 한다.
+
+### 7.4 Batch
+
+파일:
+
+- `BatchAdapterService.java`
+- `BatchJobConfig.java`
+- `V3__create_spring_batch_metadata_tables.sql`
+
+처리:
+
+1. `JobParameters`에 `requestId`, `payload`, `timestamp`를 넣는다.
+2. `JobLauncher.run(integrationJob, params)`를 호출한다.
+3. `BatchStatus.COMPLETED`면 `SUCCESS`, 아니면 `FAILED`를 반환한다.
+
+`timestamp` JobParameter는 같은 Job이 반복 실행될 때 Spring Batch가 같은 JobInstance로 판단하지 않게 하기 위한 값이다.
+
+`integrationItemReader()`는 `@StepScope`가 붙은 `ListItemReader<String>`다. Step 실행마다 reader 인스턴스를 새로 만들어 반복 실행 시 첫 실행 이후 데이터가 비는 문제를 피한다.
+
+Spring Batch 메타데이터 테이블은 Flyway V3에서 생성한다.
+
+### 7.5 REST
+
+파일:
+
+- `RestAdapterService.java`
+- `LegacyRestService.java`
+
+현재 REST 어댑터는 `WebClient.block()`이나 localhost self-call을 사용하지 않는다. `LegacyRestService.echo()`를 직접 호출한다.
+
+이 구조는 로컬 데모에서 서블릿 스레드가 자기 자신을 다시 호출해 고갈되는 문제를 피하기 위한 선택이다.
+
+---
+
+## 8. Kafka 설계
+
+### 8.1 topic
+
+`KafkaConfig`가 topic을 생성한다.
+
+| topic | 목적 | partition |
+| --- | --- | --- |
+| `integration-events` | 통합 이벤트 발행 | 3 |
+| `integration-events-dlt` | 실패 메시지 보관 | 1 |
+
+### 8.2 docker-compose listener
+
+Kafka는 Docker 내부 listener와 host listener를 분리한다.
+
+```yaml
+KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+```
+
+Spring Boot 앱은 host에서 `localhost:9092`로 접속한다. Kafka 컨테이너 내부 통신은 `kafka:29092`를 사용한다.
+
+---
+
+## 9. SFTP 설계
+
+SFTP는 보안 설정을 로컬 데모에서도 최대한 운영과 비슷하게 가져간다.
+
+구현된 것:
+
+- `StrictHostKeyChecking=yes`
+- `${user.home}/.ssh/known_hosts` 사용
+- Docker SFTP host key 고정
+- session/channel connect timeout 10초
+- finally에서 session/channel 정리
+- `SFTP_PASSWORD` 등 환경변수 override 지원
+
+known_hosts 최초 등록:
+
+```bash
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
+ssh-keygen -R "[localhost]:2222" -f "$HOME/.ssh/known_hosts"
+ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
+chmod 600 "$HOME/.ssh/known_hosts"
+```
+
+고정 host key를 사용하므로 일반적인 `docker compose down -v` 이후에도 매번 다시 등록할 필요는 없다. 단, `docker/sftp/host_keys/` 파일을 교체하면 다시 등록해야 한다.
+
+---
+
+## 10. Batch 설계
+
+Spring Batch는 `spring.batch.job.enabled=false`로 자동 실행을 끈다.
+
+실행은 `BatchAdapterService`에서 `JobLauncher`로 직접 수행한다.
+
+구성:
+
+- Job: `integrationJob`
+- Step: `integrationStep`
+- Reader: `@StepScope ListItemReader<String>`
+- Processor: `processed-` prefix를 붙이는 단순 처리
+- Writer: 처리 항목 로그 기록
+
+메타데이터:
+
+- `BATCH_JOB_INSTANCE`
+- `BATCH_JOB_EXECUTION`
+- `BATCH_JOB_EXECUTION_PARAMS`
+- `BATCH_STEP_EXECUTION`
+- `BATCH_*_CONTEXT`
+- `BATCH_*_SEQ`
+
+위 테이블은 `V3__create_spring_batch_metadata_tables.sql`에서 생성한다.
+
+---
+
+## 11. DB와 Flyway
+
+### 11.1 도메인 테이블
+
+`V1__init.sql`:
+
+| 테이블 | 목적 |
+| --- | --- |
+| `integration_requests` | 통합 요청 단위 저장 |
+| `protocol_results` | 프로토콜별 실행 결과 저장 |
+| `system_logs` | 요청 생명주기와 이벤트 로그 저장 |
+
+### 11.2 인덱스
+
+`V2__add_indexes.sql`는 조회 성능을 위한 인덱스를 추가한다.
+
+주요 조회 패턴:
+
+- requestId로 요청 상태 조회
+- requestId로 protocol results 조회
+- protocol + timestamp로 logs 조회
+- timestamp desc로 최근 로그 조회
+
+`V4__remove_duplicate_request_id_index.sql`는 `request_id UNIQUE`와 중복되는 인덱스를 제거한다.
+
+### 11.3 JPA 설정
+
+운영 profile 기본값은 다음 정책을 사용한다.
 
 ```yaml
 spring:
-  application:
-    name: finbridge-portfolio
-  
-  # MySQL 연결
-  datasource:
-    url: jdbc:mysql://localhost:3306/finbridge
-    username: root
-    password: root
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  
-  # JPA 설정
   jpa:
+    open-in-view: false
     hibernate:
-      ddl-auto: validate  # Flyway가 관리하므로 validate만 사용
-    show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
-  
-  # Kafka 설정
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all
-      retries: 3
-    consumer:
-      bootstrap-servers: localhost:9092
-      group-id: finbridge-group
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      auto-offset-reset: earliest
-
-server:
-  port: 8080
-  servlet:
-    context-path: /
-
-logging:
-  level:
-    com.finbridge: DEBUG
-    org.springframework: INFO
-    org.apache.kafka: WARN
+      ddl-auto: validate
+  flyway:
+    enabled: true
 ```
+
+스키마 생성은 Flyway가 맡고, Hibernate는 entity와 DB 스키마가 맞는지 검증한다.
 
 ---
 
-## docker-compose.yml
+## 12. API 명세
 
-```yaml
-version: '3.8'
+### 12.1 POST /api/integrate
 
-services:
-  mysql:
-    image: mysql:8.0
-    container_name: finbridge-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: finbridge
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+요청:
 
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: finbridge-kafka
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
-      KAFKA_PROCESS_ROLES: 'broker,controller'
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
-      KAFKA_LISTENERS: 'PLAINTEXT://kafka:9092,CONTROLLER://kafka:29093'
-      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
-      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      CLUSTER_ID: 'MkQkSWJUTHW0NjB3ZEdWdQ'
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-    ports:
-      - "9092:9092"
-    volumes:
-      - kafka_data:/tmp/kraft-combined-logs
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server=localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  mysql_data:
-  kafka_data:
-```
-
----
-
-## Flyway 마이그레이션
-
-### V1__init.sql (초기 스키마)
-
-```sql
-CREATE TABLE system_logs (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  request_id VARCHAR(255) NOT NULL,
-  event VARCHAR(255) NOT NULL,
-  details TEXT,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_request_id (request_id),
-  INDEX idx_timestamp (timestamp)
-);
-
-CREATE TABLE protocol_results (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  request_id VARCHAR(255) NOT NULL,
-  protocol VARCHAR(50) NOT NULL,
-  status VARCHAR(20) NOT NULL,
-  message TEXT,
-  execution_time BIGINT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_request_id (request_id),
-  INDEX idx_protocol (protocol)
-);
-```
-
-### V2__add_indexes.sql (성능 인덱스)
-
-```sql
-CREATE INDEX idx_logs_event ON system_logs(event);
-CREATE INDEX idx_protocol_status ON protocol_results(status);
-```
-
----
-
-## 핵심 구현체
-
-### KafkaConfig.java
-
-```java
-@Configuration
-public class KafkaConfig {
-    
-    public static final String INTEGRATION_TOPIC = "integration-events";
-    public static final String DLT_TOPIC = "integration-events-dlt";
-    
-    @Bean
-    public NewTopic integrationTopic() {
-        return TopicBuilder.name(INTEGRATION_TOPIC)
-            .partitions(3)
-            .replicas(1)
-            .build();
-    }
-    
-    @Bean
-    public NewTopic dltTopic() {
-        return TopicBuilder.name(DLT_TOPIC)
-            .partitions(1)
-            .replicas(1)
-            .build();
-    }
+```json
+{
+  "protocols": ["SOAP", "KAFKA", "SFTP", "BATCH", "REST"],
+  "payload": {
+    "customerId": "demo-customer",
+    "amount": 12000,
+    "currency": "KRW"
+  }
 }
 ```
 
-### SoapAdapterService.java (Apache CXF)
+응답:
 
-```java
-@Service
-@Slf4j
-public class SoapAdapterService {
-    
-    public String callLegacySystem(String payload) throws Exception {
-        log.info("SOAP: Calling legacy system with payload: {}", payload);
-        // Apache CXF로 SOAP 호출
-        // 실제 WSDL 기반 웹서비스 호출
-        Thread.sleep(100);  // 네트워크 지연 시뮬레이션
-        return "SOAP Response: Processed [" + payload + "]";
+```json
+{
+  "requestId": "550e8400-e29b-41d4-a716-446655440000",
+  "overallStatus": "ALL_SUCCESS",
+  "results": {
+    "SOAP": {
+      "status": "SUCCESS",
+      "responseCode": "200",
+      "responseMessage": "SOAP 레거시 처리 완료",
+      "executionTimeMs": 12
+    },
+    "KAFKA": {
+      "status": "SUCCESS",
+      "responseCode": "200",
+      "responseMessage": "Kafka 메시지 발행 완료",
+      "executionTimeMs": 41
     }
+  },
+  "createdAt": "2026-04-26T04:20:10",
+  "completedAt": "2026-04-26T04:20:11"
 }
 ```
 
-### SftpAdapterService.java (JSch)
+`createdAt`은 요청 생성 시각이다.
 
-```java
-@Service
-@Slf4j
-public class SftpAdapterService {
-    
-    public boolean uploadFile(String filename, byte[] data) {
-        log.info("SFTP: Uploading file: {} (size: {} bytes)", filename, data.length);
-        try {
-            java.nio.file.Files.write(
-                java.nio.file.Paths.get("/tmp/" + filename),
-                data
-            );
-            log.info("SFTP: File saved to /tmp/{}", filename);
-            return true;
-        } catch (Exception e) {
-            log.error("SFTP: Upload failed", e);
-            return false;
-        }
-    }
-}
-```
+`completedAt`은 요청된 모든 프로토콜 결과가 확정되고 최종 상태가 저장된 시각이다.
 
-### KafkaService.java
+### 12.2 GET /api/integrate/{requestId}
 
-```java
-@Service
-@Slf4j
-public class KafkaService {
-    
-    @Autowired
-    private KafkaTemplate<String, String> kafkaTemplate;
-    
-    public void publishMessage(String messageId, String payload) {
-        log.info("Kafka: Publishing message ID: {}", messageId);
-        kafkaTemplate.send(KafkaConfig.INTEGRATION_TOPIC, 
-            messageId, messageId + "|" + payload);
-    }
-    
-    @KafkaListener(topics = KafkaConfig.INTEGRATION_TOPIC)
-    public void consumeMessage(String message) {
-        log.info("Kafka: Consumed message: {}", message);
-    }
-}
-```
+존재하는 요청이면 `IntegrationResponseDTO`를 반환한다.
 
-### BatchAdapterService.java (Spring Batch)
+없는 요청이면 404를 반환한다.
 
-```java
-@Service
-@Slf4j
-public class BatchAdapterService {
-    
-    public String submitBatchJob(String payload) {
-        String batchId = "BATCH-" + UUID.randomUUID().toString().substring(0, 8);
-        log.info("Batch: Job submitted with ID: {} Payload: {}", batchId, payload);
-        return batchId;
-    }
-}
-```
+### 12.3 GET /api/logs
 
----
+요청:
 
-## 통합 테스트
-
-```java
-@SpringBootTest
-@AutoConfigureMockMvc
-class IntegrationTest {
-    
-    @Autowired
-    private MockMvc mockMvc;
-    
-    @Test
-    void testFullIntegrationFlow() throws Exception {
-        IntegrationRequest request = IntegrationRequest.builder()
-            .requestId("TEST-001")
-            .protocol("ALL")
-            .payload("Test payment data")
-            .build();
-        
-        mockMvc.perform(post("/api/integrate")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(new ObjectMapper().writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("SUCCESS"))
-            .andExpect(jsonPath("$.results.SOAP.status").value("SUCCESS"))
-            .andExpect(jsonPath("$.results.KAFKA.status").value("SUCCESS"))
-            .andExpect(jsonPath("$.results.SFTP.status").value("SUCCESS"))
-            .andExpect(jsonPath("$.results.BATCH.status").value("SUCCESS"));
-    }
-}
-```
-
----
-
-## 실행 체크리스트
-
-- [ ] Docker Desktop 실행
-- [ ] `docker-compose up -d` 실행
-- [ ] `gradle clean build` 실행
-- [ ] `gradle bootRun` 실행
-- [ ] MySQL 마이그레이션 확인 (로그에 Flyway 메시지)
-- [ ] Kafka 토픽 생성 확인
-- [ ] `http://localhost:8080` 접속
-- [ ] 요청 폼에서 "요청 전송" 버튼 클릭
-- [ ] 5개 프로토콜 모두 SUCCESS 표시 확인
-- [ ] 로그 탭에서 처리 기록 확인
-
----
-
-## 주요 변경사항
-
-| 항목 | 이전 | 현재 |
-|------|------|------|
-| **메시지 큐** | RabbitMQ | Kafka |
-| **DB** | H2 (인메모리) | MySQL (Docker) |
-| **마이그레이션** | 없음 | Flyway |
-| **SOAP** | Mock | Apache CXF (실제) |
-| **SFTP** | Mock | JSch (실제) |
-| **Batch** | Mock | Spring Batch (실제) |
-| **빌드** | Maven | Gradle |
-
----
-
-## 트러블슈팅
-
-**Kafka 연결 실패:**
 ```bash
-docker logs finbridge-kafka
-# 또는
-docker-compose logs kafka
+GET /api/logs?limit=10&offset=0
+GET /api/logs?protocol=SFTP&limit=10&offset=0
 ```
 
-**MySQL 접속 실패:**
+응답:
+
+```json
+{
+  "total": 3,
+  "limit": 10,
+  "offset": 0,
+  "logs": [
+    {
+      "id": 1,
+      "requestId": "550e8400-e29b-41d4-a716-446655440000",
+      "protocol": "SFTP",
+      "eventType": "SUCCESS",
+      "eventDetail": "SFTP 처리 결과: SUCCESS",
+      "timestamp": "2026-04-26T04:20:11"
+    }
+  ]
+}
+```
+
+---
+
+## 13. 테스트 전략
+
+### 13.1 Unit Test
+
+주요 단위 테스트:
+
+- `IntegrationControllerTest`
+- `IntegrationServiceTest`
+- `KafkaConsumerServiceTest`
+- `IntegrationExecutorConfigTest`
+- `BatchAdapterServiceTest`
+- `KafkaAdapterServiceTest`
+
+검증 대상:
+
+- protocol validation
+- lowercase normalization
+- invalid limit/offset 처리
+- overallStatus 계산
+- ProtocolResult 중앙 저장
+- lifecycle SystemLog 저장
+- Kafka 메시지 포맷과 consumer parsing
+- Batch JobParameters
+- Executor thread name
+
+실행:
+
 ```bash
-docker exec finbridge-mysql mysql -uroot -proot -D finbridge -e "SELECT 1;"
+./gradlew test
 ```
 
-**Flyway 마이그레이션 에러:**
-- MySQL 접속 확인
-- `db/migration/` 파일 권한 확인
-- `application.yml`의 datasource 설정 확인
+### 13.2 H2 기반 Spring Integration Test
+
+`IntegrationApiIT`는 Spring MVC, Service, Repository, H2 DB 경로를 검증한다.
+
+특징:
+
+- adapter는 mock 처리
+- Flyway는 비활성화
+- JPA `ddl-auto=create-drop`
+- API와 DB 저장 흐름을 빠르게 검증
+
+이 테스트는 외부 시스템 실제 연동 검증이 아니다. 빠른 API/DB 통합 테스트다.
+
+### 13.3 Docker E2E Test
+
+`RealDockerE2EIT`는 실제 Docker 서비스를 사용한다.
+
+검증 대상:
+
+- MySQL + Flyway migration
+- Kafka publish
+- SFTP upload
+- Spring Batch job execution
+- 5개 프로토콜 전체 `/api/integrate` 성공
+
+실행:
+
+```bash
+RUN_DOCKER_E2E=true ./gradlew test --tests '*RealDockerE2EIT'
+```
+
+전제:
+
+- `docker compose up -d`
+- SFTP known_hosts 등록 완료
+
+---
+
+## 14. 주요 장애 대응 포인트
+
+### SFTP HostKey has been changed
+
+원인:
+
+- known_hosts에 저장된 `[localhost]:2222` key와 현재 SFTP 서버 key가 다름
+
+대응:
+
+```bash
+ssh-keygen -R "[localhost]:2222" -f "$HOME/.ssh/known_hosts"
+ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
+```
+
+현재는 Docker SFTP host key를 repo에 고정했으므로, host key 파일을 바꾸지 않는 한 자주 발생하지 않아야 한다.
+
+### SFTP Permission denied
+
+원인:
+
+- `/home/finbridge/upload` 소유권 또는 권한 문제
+
+대응:
+
+- `docker/sftp/init.d/fix-upload-permissions.sh`가 컨테이너 시작 시 권한을 보정한다.
+- 문제가 반복되면 `docker compose logs sftp`와 컨테이너 내부 `/home/finbridge/upload` 권한을 확인한다.
+
+### Kafka host app connection 실패
+
+원인:
+
+- broker가 host 앱에 `kafka:9092`를 advertised listener로 알려주는 경우
+
+현재 구성:
+
+- host 앱: `localhost:9092`
+- Docker 내부: `kafka:29092`
+
+`docker-compose.yml`의 `KAFKA_ADVERTISED_LISTENERS`를 변경할 때 이 분리를 유지해야 한다.
+
+### Batch metadata table 오류
+
+원인:
+
+- Spring Batch가 필요한 `BATCH_*` 테이블이 없음
+
+현재 구성:
+
+- Flyway V3가 Spring Batch metadata tables를 생성한다.
+- `spring.jpa.hibernate.ddl-auto=validate`이므로 DB 스키마가 없으면 앱 시작 또는 Job 실행 시 실패한다.
+
+### /api/logs 500 오류
+
+과거 이슈:
+
+- `limit=0` 또는 음수 offset이 `OffsetBasedPageRequest`에서 500을 유발할 수 있었다.
+
+현재 구성:
+
+- Controller에서 `limit <= 0`, `offset < 0`을 400으로 처리한다.
+
+---
+
+## 15. 운영 전 개선 포인트
+
+현재 구현은 로컬 데모와 포트폴리오 검증에 맞춰져 있다. 운영 반영 전에는 아래 항목을 추가로 설계해야 한다.
+
+| 항목 | 현재 상태 | 운영 전 권장 |
+| --- | --- | --- |
+| 인증/권한 | 없음 | Spring Security, 관리자 권한, 요청자별 접근 제어 |
+| CORS | `CORS_ALLOWED_ORIGINS` 환경변수 지원 | 실제 프론트엔드 도메인만 허용 |
+| SFTP 비밀번호 | 환경변수 override 지원, 기본값 있음 | Secret Manager 또는 배포 환경변수로 강제 |
+| 외부 SOAP/REST | 내부 legacy service 직접 호출 | 외부 endpoint, timeout, 인증서, 장애 격리 설정 |
+| 재처리 | 미구현 | 실패 프로토콜 단위 retry API |
+| 알림 | 미구현 | 실패/timeout 기준 Slack, Email, SMS 알림 |
+| 관측성 | 로그 중심 | metric, trace, dashboard 추가 |
+| 부하 제어 | fixed thread pool 10 | 요청량 기준 queue, rejection policy, rate limit 검토 |
+
+---
+
+## 16. 유지보수 체크리스트
+
+새 프로토콜을 추가할 때:
+
+1. `ProtocolType` enum에 값 추가
+2. `IntegrationController.SUPPORTED_PROTOCOLS`에 값 추가
+3. `ProtocolAdapter` 구현체 추가
+4. `IntegrationService.processIntegration()`에 future 등록 로직 추가
+5. `ProtocolResult` 저장과 `SystemLog` 저장이 중앙 흐름에 들어오는지 확인
+6. unit test, integration test, 필요 시 Docker E2E test 추가
+
+DB 스키마를 바꿀 때:
+
+1. entity 수정
+2. Flyway migration 추가
+3. `ddl-auto=validate` 기준으로 앱 기동 확인
+4. Docker E2E test로 MySQL migration 경로 확인
+
+외부 시스템 설정을 바꿀 때:
+
+1. `application.yml` 기본값 확인
+2. test/e2e profile 설정 확인
+3. Docker Compose 포트와 advertised listener 확인
+4. README와 이 문서의 실행 방법 동기화
