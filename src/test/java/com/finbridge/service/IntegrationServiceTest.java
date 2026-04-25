@@ -2,6 +2,7 @@ package com.finbridge.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finbridge.model.dto.AdapterExecutionConfig;
 import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.dto.RetryResponseDTO;
@@ -260,6 +261,36 @@ class IntegrationServiceTest {
         verify(restAdapterService).execute(anyString(), any());
         assertThat(response.getOverallStatus()).isEqualTo(OverallStatus.ALL_SUCCESS);
         assertThat(response.getResults().get("REST").getStatus()).isEqualTo(ResultStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("enabled=true 설정이 있으면 Adapter에 endpoint/timeout 설정을 전달한다")
+    void processIntegration_enabledConfig_passesConfigToAdapter() throws Exception {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
+        InterfaceConfig restConfig = new InterfaceConfig();
+        restConfig.setProtocol(ProtocolType.REST);
+        restConfig.setInterfaceName("REST Config");
+        restConfig.setEndpoint("configured-rest-endpoint");
+        restConfig.setTimeoutMs(1234);
+        restConfig.setEnabled(true);
+        when(interfaceConfigRepository.findByProtocol(ProtocolType.REST))
+                .thenReturn(List.of(restConfig));
+        when(restAdapterService.execute(anyString(), any(), any(AdapterExecutionConfig.class)))
+                .thenReturn(new ProtocolResultDTO(ResultStatus.SUCCESS, "200", "OK", 10L));
+
+        var request = buildRequest(List.of("REST"), Map.of());
+        IntegrationResponseDTO response = integrationService.processIntegration(request);
+
+        verify(restAdapterService, never()).execute(anyString(), any());
+
+        var configCaptor = org.mockito.ArgumentCaptor.forClass(AdapterExecutionConfig.class);
+        verify(restAdapterService).execute(anyString(), any(), configCaptor.capture());
+        assertThat(configCaptor.getValue().getProtocol()).isEqualTo(ProtocolType.REST);
+        assertThat(configCaptor.getValue().getInterfaceName()).isEqualTo("REST Config");
+        assertThat(configCaptor.getValue().getEndpoint()).isEqualTo("configured-rest-endpoint");
+        assertThat(configCaptor.getValue().getTimeoutMs()).isEqualTo(1234);
+        assertThat(response.getOverallStatus()).isEqualTo(OverallStatus.ALL_SUCCESS);
     }
 
     // =========================================================================
