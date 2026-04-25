@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinBridge Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Design tokens ────────────────────────────────────────── */
+:root {
+  --bg:        #f0f4f8;
+  --bg2:       #ffffff;
+  --bg3:       #f8fafc;
+  --border:    #e2e8f0;
+  --border2:   #cbd5e0;
+  --text:      #1a202c;
+  --text2:     #4a5568;
+  --text3:     #a0aec0;
+  --font:      'Inter', -apple-system, sans-serif;
+  --mono:      'JetBrains Mono', monospace;
+  --radius:    8px;
+  --radius-sm: 4px;
+  --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.05);
+
+  /* primary blue */
+  --blue:      #2563eb;
+  --blue-dark: #1d4ed8;
+  --blue-bg:   #eff6ff;
+  --blue-border: #bfdbfe;
+
+  /* status */
+  --success:        #16a34a;
+  --success-bg:     #dcfce7;
+  --success-border: #86efac;
+  --warning:        #d97706;
+  --warning-bg:     #fef3c7;
+  --warning-border: #fcd34d;
+  --error:          #dc2626;
+  --error-bg:       #fee2e2;
+  --error-border:   #fca5a5;
+
+  /* protocol colors */
+  --soap-c:  #7c3aed; --soap-bg:  #f5f3ff; --soap-bd:  #c4b5fd;
+  --kafka-c: #ea580c; --kafka-bg: #fff7ed; --kafka-bd: #fdba74;
+  --sftp-c:  #0891b2; --sftp-bg:  #ecfeff; --sftp-bd:  #67e8f9;
+  --batch-c: #1e40af; --batch-bg: #eff6ff; --batch-bd: #93c5fd;
+  --rest-c:  #16a34a; --rest-bg:  #f0fdf4; --rest-bd:  #86efac;
+}
+
+/* ── Reset ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+button { font-family: var(--font); font-size: 13px; cursor: pointer; }
+input, textarea, select { font-family: var(--font); font-size: 13px; }
+
+/* ── Topbar ──────────────────────────────────────────────── */
+.topbar {
+  background: #0f172a;
+  color: #f8fafc;
+  height: 52px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid #1e293b;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -.3px;
+  white-space: nowrap;
+}
+.brand-icon {
+  width: 22px; height: 22px;
+  background: var(--blue);
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+}
+.topbar-sep {
+  width: 1px; height: 24px;
+  background: #334155;
+  flex-shrink: 0;
+}
+.topbar-indicators {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+.svc-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.svc-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #475569;
+  flex-shrink: 0;
+  transition: background .3s;
+}
+.svc-dot.ok  { background: #4ade80; box-shadow: 0 0 4px #4ade8088; }
+.svc-dot.err { background: #f87171; }
+.svc-dot.checking { background: #fbbf24; animation: pulse .8s infinite alternate; }
+@keyframes pulse { to { opacity: .4; } }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.btn-seed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid #334155;
+  border-radius: var(--radius-sm);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+}
+.btn-seed:hover { background: rgba(255,255,255,.12); border-color: #475569; }
+.btn-seed-note { font-size: 10px; color: #64748b; margin-left: 2px; }
+
+/* ── Main grid ───────────────────────────────────────────── */
+.console-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+  padding: 16px;
+  max-width: 1520px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.card-body { padding: 16px; }
+
+/* ── Section label ───────────────────────────────────────── */
+.field-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin-bottom: 8px;
+}
+
+/* ── Protocol chips ──────────────────────────────────────── */
+.proto-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.proto-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border2);
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  user-select: none;
+}
+.proto-chip input[type=checkbox] { display: none; }
+.proto-chip .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--border2);
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.proto-chip.checked {
+  border-color: var(--chip-color, var(--blue));
+  background: var(--chip-bg, var(--blue-bg));
+  color: var(--chip-color, var(--blue));
+}
+.proto-chip.checked .dot { background: var(--chip-color, var(--blue)); }
+
+.proto-chip[data-proto="SOAP"]  { --chip-color: var(--soap-c);  --chip-bg: var(--soap-bg);  }
+.proto-chip[data-proto="KAFKA"] { --chip-color: var(--kafka-c); --chip-bg: var(--kafka-bg); }
+.proto-chip[data-proto="SFTP"]  { --chip-color: var(--sftp-c);  --chip-bg: var(--sftp-bg);  }
+.proto-chip[data-proto="BATCH"] { --chip-color: var(--batch-c); --chip-bg: var(--batch-bg); }
+.proto-chip[data-proto="REST"]  { --chip-color: var(--rest-c);  --chip-bg: var(--rest-bg);  }
+
+/* ── Payload editor ──────────────────────────────────────── */
+.payload-editor {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg3);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+}
+.payload-editor:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+
+/* ── Action row ──────────────────────────────────────────── */
+.action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+.timing-badge {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  margin-left: auto;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue-dark);
+}
+.btn-primary:hover { background: var(--blue-dark); }
+.btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border-color: var(--border);
+}
+.btn-ghost:hover { background: var(--bg3); border-color: var(--border2); }
+
+/* ── Error alert ─────────────────────────────────────────── */
+.error-alert {
+  display: none;
+  padding: 8px 12px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-sm);
+  color: var(--error);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.error-alert.visible { display: block; }
+
+/* ── Result panel ────────────────────────────────────────── */
+.result-panel .card-header { justify-content: space-between; }
+.id-lookup {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.id-input {
+  width: 220px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg3);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  outline: none;
+}
+.id-input:focus { border-color: var(--blue); }
+.id-input::placeholder { color: var(--text3); font-family: var(--font); }
+
+/* ── Result content ──────────────────────────────────────── */
+.result-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: var(--text3);
+  text-align: center;
+  gap: 10px;
+}
+.result-placeholder svg { opacity: .3; }
+.result-placeholder p { font-size: 13px; }
+
+.overall-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .3px;
+}
+.badge-success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.badge-partial  { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+.badge-failed   { background: var(--error-bg);   color: var(--error);   border: 1px solid var(--error-border); }
+
+.request-id-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  color: var(--text2);
+}
+.request-id-val {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  word-break: break-all;
+}
+.copy-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  color: var(--text2);
+  cursor: pointer;
+}
+.copy-btn:hover { background: var(--bg3); }
+
+/* ── Results table ───────────────────────────────────────── */
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.results-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.results-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.results-table tr:last-child td { border-bottom: none; }
+.results-table tr:hover td { background: var(--bg3); }
+.proto-cell {
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 11px;
+}
+.proto-cell[data-p="SOAP"]  { color: var(--soap-c); }
+.proto-cell[data-p="KAFKA"] { color: var(--kafka-c); }
+.proto-cell[data-p="SFTP"]  { color: var(--sftp-c); }
+.proto-cell[data-p="BATCH"] { color: var(--batch-c); }
+.proto-cell[data-p="REST"]  { color: var(--rest-c); }
+.exec-time { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.resp-msg { color: var(--text2); max-width: 300px; }
+
+/* ── Status pills ────────────────────────────────────────── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+.pill-success { background: var(--success-bg); color: var(--success); }
+.pill-failed  { background: var(--error-bg);   color: var(--error); }
+.pill-partial { background: var(--warning-bg); color: var(--warning); }
+
+/* ── Divider ─────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* ── Logs section ────────────────────────────────────────── */
+.logs-section {
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: 0 16px 24px;
+}
+.logs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.logs-select {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 12px;
+}
+.logs-select:focus { outline: none; border-color: var(--blue); }
+.total-badge {
+  font-size: 11.5px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 12px;
+}
+.logs-table th {
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg3);
+  text-align: left;
+}
+.logs-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.logs-table tr:last-child td { border-bottom: none; }
+.logs-table tr:hover td { background: #fafbfc; }
+.log-reqid {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--blue);
+  cursor: pointer;
+  text-decoration: none;
+}
+.log-reqid:hover { text-decoration: underline; }
+.proto-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--mono);
+}
+.proto-badge[data-p="SOAP"]  { background: var(--soap-bg);  color: var(--soap-c);  }
+.proto-badge[data-p="KAFKA"] { background: var(--kafka-bg); color: var(--kafka-c); }
+.proto-badge[data-p="SFTP"]  { background: var(--sftp-bg);  color: var(--sftp-c);  }
+.proto-badge[data-p="BATCH"] { background: var(--batch-bg); color: var(--batch-c); }
+.proto-badge[data-p="REST"]  { background: var(--rest-bg);  color: var(--rest-c);  }
+.proto-badge-neutral { background: var(--bg3); color: var(--text2); }
+.event-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+/* actual API event types: SUCCESS, INITIATED, FAILED */
+.event-SUCCESS   { background: var(--success-bg); color: var(--success); }
+.event-INITIATED { background: var(--blue-bg);    color: var(--blue); }
+.event-FAILED    { background: var(--error-bg);   color: var(--error); }
+/* legacy / fallback aliases */
+.event-COMPLETED { background: var(--success-bg); color: var(--success); }
+.event-STARTED   { background: var(--warning-bg); color: var(--warning); }
+.event-RECEIVED  { background: var(--blue-bg);    color: var(--blue); }
+.log-detail { color: var(--text2); max-width: 320px; }
+.ts-cell    { color: var(--text3); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+
+/* ── Pagination ──────────────────────────────────────────── */
+.pagination-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.pg-info { font-size: 12px; color: var(--text2); flex: 1; text-align: center; }
+.logs-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text3);
+  font-size: 13px;
+}
+
+/* ── Spinner ─────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin .7s linear infinite; }
+
+/* ── Timestamp footer ────────────────────────────────────── */
+.ts-footer { font-size: 11px; color: var(--text3); margin-top: 8px; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .console-grid { grid-template-columns: 1fr; }
+  .id-lookup { flex-wrap: wrap; }
+  .id-input { width: 100%; }
+  .topbar-indicators .svc-badge:not(:first-child) { display: none; }
+}
+@media (max-width: 640px) {
+  .console-grid { padding: 10px; gap: 10px; }
+  .logs-section { padding: 0 10px 20px; }
+  .results-table th:nth-child(3),
+  .results-table td:nth-child(3),
+  .results-table th:nth-child(4),
+  .results-table td:nth-child(4) { display: none; }
+  .logs-table th:nth-child(1),
+  .logs-table td:nth-child(1) { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ TOPBAR ═══════════════════════════ -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-icon">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    FinBridge Console
+  </div>
+
+  <div class="topbar-sep"></div>
+
+  <div class="topbar-indicators">
+    <div class="svc-badge">
+      <span class="svc-dot checking" id="apiDot"></span>
+      <span id="apiLabel">API 확인 중...</span>
+    </div>
+    <span style="font-size:11px;color:#475569">외부 서비스(Kafka/SFTP/Batch)는 샘플 요청으로 검증하세요</span>
+  </div>
+
+  <div class="topbar-right">
+    <button class="btn-seed" id="seedBtn" onclick="runSeed()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M12 2v20M2 12h20"/>
+      </svg>
+      샘플 요청 5건 실행
+      <span class="btn-seed-note">· Kafka/SFTP/Batch 실행됨</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════ 2-COLUMN GRID ════════════════════ -->
+<div class="console-grid">
+
+  <!-- ── LEFT: Request builder ── -->
+  <div class="card" id="requestCard">
+    <div class="card-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+      <span class="card-title">요청 작성</span>
+      <span style="font-size:11px;color:var(--text3)">POST /api/integrate</span>
+    </div>
+    <div class="card-body">
+
+      <span class="field-label">프로토콜 선택</span>
+      <div class="proto-grid" id="protocolGrid">
+        <label class="proto-chip checked" data-proto="SOAP">
+          <input type="checkbox" value="SOAP" checked>
+          <span class="dot"></span>SOAP
+        </label>
+        <label class="proto-chip checked" data-proto="KAFKA">
+          <input type="checkbox" value="KAFKA" checked>
+          <span class="dot"></span>KAFKA
+        </label>
+        <label class="proto-chip checked" data-proto="SFTP">
+          <input type="checkbox" value="SFTP" checked>
+          <span class="dot"></span>SFTP
+        </label>
+        <label class="proto-chip checked" data-proto="BATCH">
+          <input type="checkbox" value="BATCH" checked>
+          <span class="dot"></span>BATCH
+        </label>
+        <label class="proto-chip checked" data-proto="REST">
+          <input type="checkbox" value="REST" checked>
+          <span class="dot"></span>REST
+        </label>
+      </div>
+
+      <span class="field-label">Payload (JSON)</span>
+      <textarea class="payload-editor" id="payloadEditor" spellcheck="false">{
+  "customerId": "test-001",
+  "amount": 50000,
+  "currency": "KRW",
+  "targetSystem": "CORE_BANKING"
+}</textarea>
+
+      <div id="integrateError" class="error-alert"></div>
+
+      <div class="action-row">
+        <button class="btn btn-ghost" onclick="resetIntegratePanel()">초기화</button>
+        <button class="btn btn-primary" id="sendBtn" onclick="sendIntegrate()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+          요청 전송
+        </button>
+        <span class="timing-badge" id="integrateTiming" style="display:none"></span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Result panel ── -->
+  <div class="card" id="resultCard">
+    <div class="card-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/>
+      </svg>
+      <span class="card-title">실행 결과</span>
+      <div class="id-lookup">
+        <input class="id-input" id="requestIdInput" placeholder="RequestId 직접 조회...">
+        <button class="btn btn-ghost" id="statusFetchBtn" onclick="fetchStatus()" style="padding:5px 10px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+          </svg>
+          조회
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="statusError" class="error-alert"></div>
+      <div id="resultContent">
+        <!-- placeholder -->
+        <div class="result-placeholder" id="resultPlaceholder">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M9 9h6M9 13h6M9 17h4"/>
+          </svg>
+          <p>왼쪽에서 요청을 전송하면<br>결과가 여기에 표시됩니다</p>
+        </div>
+        <div id="resultBody" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /console-grid -->
+
+<!-- ═══════════════════════ LOGS (always visible) ══════════════ -->
+<div class="logs-section">
+  <div class="card">
+    <div class="card-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+      </svg>
+      <span class="card-title">시스템 로그</span>
+      <span class="total-badge" id="logsTotalBadge"></span>
+    </div>
+    <div class="card-body">
+      <div class="logs-toolbar">
+        <select class="logs-select" id="logProtocol">
+          <option value="">전체 프로토콜</option>
+          <option value="SOAP">SOAP</option>
+          <option value="KAFKA">KAFKA</option>
+          <option value="SFTP">SFTP</option>
+          <option value="BATCH">BATCH</option>
+          <option value="REST">REST</option>
+        </select>
+        <select class="logs-select" id="logLimit">
+          <option value="20">20건</option>
+          <option value="50" selected>50건</option>
+          <option value="100">100건</option>
+        </select>
+        <input type="hidden" id="logOffset" value="0">
+        <button class="btn btn-ghost" id="logFetchBtn" onclick="fetchLogs()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+          </svg>
+          새로고침
+        </button>
+      </div>
+      <div id="logsError" class="error-alert" style="margin-top:8px;display:none"></div>
+
+      <table class="logs-table">
+        <thead><tr>
+          <th>#</th>
+          <th>RequestId</th>
+          <th>프로토콜</th>
+          <th>이벤트</th>
+          <th>상세</th>
+          <th>시각</th>
+        </tr></thead>
+        <tbody id="logsTableBody">
+          <tr><td colspan="6" class="logs-empty">로그를 불러오는 중...</td></tr>
+        </tbody>
+      </table>
+
+      <div class="pagination-row">
+        <button class="btn btn-ghost" id="prevBtn" onclick="logsPage(-1)" disabled>
+          ‹ 이전
+        </button>
+        <span class="pg-info" id="paginationInfo">—</span>
+        <button class="btn btn-ghost" id="nextBtn" onclick="logsPage(1)" disabled>
+          다음 ›
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ SCRIPTS ════════════════════════════ -->
+<script type="module">
+// ── Base URL ────────────────────────────────────────────────────────────────
+const BASE = '';
+
+// ── Health check ─────────────────────────────────────────────────────────
+// /api/logs 응답만으로는 Kafka/SFTP 연결을 보장할 수 없으므로
+// API 서버 연결 여부만 표시. 외부 서비스는 topbar에서 제거.
+async function checkHealth() {
+  const dot   = document.getElementById('apiDot');
+  const label = document.getElementById('apiLabel');
+  dot.className = 'svc-dot checking';
+  try {
+    const r = await fetch(`${BASE}/api/logs?limit=1`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      dot.className     = 'svc-dot ok';
+      label.textContent = 'API 연결됨';
+    } else throw new Error(r.status);
+  } catch {
+    dot.className     = 'svc-dot err';
+    label.textContent = 'API 오프라인';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 15000);
+
+// ── Protocol chip toggle (fix: use change event on input) ─────────────────
+document.querySelectorAll('#protocolGrid .proto-chip input[type=checkbox]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    cb.closest('.proto-chip').classList.toggle('checked', cb.checked);
+  });
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return isNaN(d) ? ts : d.toLocaleString('ko-KR', { hour12: false }).replace(',', '');
+}
+
+function overallBadge(status) {
+  const map = {
+    ALL_SUCCESS:     ['badge-success', '✓ ALL_SUCCESS'],
+    PARTIAL_FAILURE: ['badge-partial', '⚠ PARTIAL_FAILURE'],
+    ALL_FAILED:      ['badge-failed',  '✗ ALL_FAILED'],
+  };
+  const [cls, label] = map[status] || ['badge-partial', status];
+  return `<span class="overall-badge ${cls}">${esc(label)}</span>`;
+}
+
+function statusPill(s) {
+  if (s === 'SUCCESS') return `<span class="status-pill pill-success">SUCCESS</span>`;
+  if (s === 'FAILED')  return `<span class="status-pill pill-failed">FAILED</span>`;
+  return `<span class="status-pill pill-partial">${esc(s)}</span>`;
+}
+
+function showError(el, msg) {
+  // Strip HTML tags and truncate to keep error messages readable
+  const clean = String(msg).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  el.textContent = clean.length > 200 ? clean.slice(0, 200) + '…' : clean;
+  el.classList.add('visible');
+  el.style.display = 'block';
+}
+function hideError(el) { el.classList.remove('visible'); el.style.display = 'none'; }
+
+// ── Render result ──────────────────────────────────────────────────────────
+function renderResultBody(data) {
+  const results = data.results || {};
+  const rows = Object.entries(results).map(([proto, r]) => `
+    <tr>
+      <td><span class="proto-cell" data-p="${esc(proto)}">${esc(proto)}</span></td>
+      <td>${statusPill(r.status)}</td>
+      <td style="color:var(--text2)">${esc(r.responseCode ?? '—')}</td>
+      <td class="resp-msg">${esc(r.responseMessage ?? '—')}</td>
+      <td class="exec-time">${r.executionTimeMs != null ? r.executionTimeMs + ' ms' : '—'}</td>
+    </tr>`).join('');
+
+  return `
+    ${overallBadge(data.overallStatus)}
+    <div class="request-id-row">
+      <span style="color:var(--text2)">RequestId</span>
+      <span class="request-id-val" id="lastRequestId">${esc(data.requestId)}</span>
+      <button class="copy-btn" onclick="copyId('${esc(data.requestId)}')">복사</button>
+    </div>
+    <div class="divider"></div>
+    <table class="results-table">
+      <thead><tr>
+        <th>프로토콜</th><th>상태</th><th>코드</th><th>메시지</th><th>소요</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="divider"></div>
+    <div class="ts-footer">응답: ${fmtTs(data.timestamp)}</div>`;
+}
+
+function showResult(data) {
+  const placeholder = document.getElementById('resultPlaceholder');
+  const body        = document.getElementById('resultBody');
+  placeholder.style.display = 'none';
+  body.style.display = 'block';
+  body.innerHTML = renderResultBody(data);
+}
+
+// ── Copy request ID ────────────────────────────────────────────────────────
+window.copyId = function(id) {
+  navigator.clipboard.writeText(id).then(() => {
+    const el = document.getElementById('lastRequestId');
+    if (el) { const orig = el.textContent; el.textContent = '복사됨!'; setTimeout(() => el.textContent = orig, 1200); }
+  });
+};
+
+// ── POST /api/integrate ────────────────────────────────────────────────────
+window.sendIntegrate = async function() {
+  const btn      = document.getElementById('sendBtn');
+  const errEl    = document.getElementById('integrateError');
+  const timingEl = document.getElementById('integrateTiming');
+
+  const protocols = [...document.querySelectorAll('#protocolGrid input:checked')].map(c => c.value);
+  if (protocols.length === 0) { showError(errEl, '프로토콜을 하나 이상 선택하세요.'); return; }
+
+  let payload;
+  try { payload = JSON.parse(document.getElementById('payloadEditor').value); }
+  catch (e) { showError(errEl, 'Payload JSON 파싱 오류: ' + e.message); return; }
+
+  hideError(errEl);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">↻</span> 전송 중...';
+  timingEl.style.display = 'none';
+
+  const t0 = Date.now();
+  try {
+    const r = await fetch(`${BASE}/api/integrate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ protocols, payload }),
+    });
+    const elapsed = Date.now() - t0;
+    if (!r.ok) { showError(errEl, `HTTP ${r.status}: ${await r.text()}`); return; }
+    const data = await r.json();
+    showResult(data);
+    timingEl.textContent = `${elapsed} ms`;
+    timingEl.style.display = 'inline';
+    // fill requestId input for quick re-lookup
+    document.getElementById('requestIdInput').value = data.requestId;
+    // refresh logs
+    fetchLogs();
+  } catch (e) {
+    showError(errEl, '요청 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> 요청 전송';
+  }
+};
+
+window.resetIntegratePanel = function() {
+  document.querySelectorAll('#protocolGrid input[type=checkbox]').forEach(cb => { cb.checked = true; });
+  document.querySelectorAll('.proto-chip').forEach(c => c.classList.add('checked'));
+  document.getElementById('payloadEditor').value = '{\n  "customerId": "test-001",\n  "amount": 50000,\n  "currency": "KRW",\n  "targetSystem": "CORE_BANKING"\n}';
+  document.getElementById('integrateError').classList.remove('visible');
+  document.getElementById('integrateTiming').style.display = 'none';
+  document.getElementById('resultPlaceholder').style.display = '';
+  document.getElementById('resultBody').style.display = 'none';
+};
+
+// ── GET /api/integrate/{requestId} ────────────────────────────────────────
+window.fetchStatus = async function() {
+  const id    = document.getElementById('requestIdInput').value.trim();
+  const errEl = document.getElementById('statusError');
+  const btn   = document.getElementById('statusFetchBtn');
+
+  if (!id) { showError(errEl, 'RequestId를 입력하세요.'); return; }
+  hideError(errEl);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">↻</span>';
+
+  try {
+    const r = await fetch(`${BASE}/api/integrate/${encodeURIComponent(id)}`);
+    if (r.status === 404) { showError(errEl, `"${id}" 를 찾을 수 없습니다.`); return; }
+    if (!r.ok) { showError(errEl, `HTTP ${r.status}`); return; }
+    showResult(await r.json());
+  } catch (e) {
+    showError(errEl, '요청 실패: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> 조회';
+  }
+};
+
+// ── GET /api/logs ──────────────────────────────────────────────────────────
+let currentOffset = 0;
+let currentTotal  = 0;
+let currentLimit  = 50;
+
+window.fetchLogs = async function(offsetOverride) {
+  const protocol = document.getElementById('logProtocol').value;
+  const limit    = parseInt(document.getElementById('logLimit').value) || 50;
+  const offset   = offsetOverride !== undefined ? offsetOverride : 0;
+  const errEl    = document.getElementById('logsError');
+  const btn      = document.getElementById('logFetchBtn');
+
+  hideError(errEl);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">↻</span> 조회 중...';
+
+  const params = new URLSearchParams({ limit, offset });
+  if (protocol) params.set('protocol', protocol);
+
+  try {
+    const r = await fetch(`${BASE}/api/logs?${params}`);
+    if (!r.ok) {
+      const body = await r.text();
+      showError(errEl, `HTTP ${r.status}: ${body}`);
+      document.getElementById('logsTableBody').innerHTML = `<tr><td colspan="6" class="logs-empty">로그를 불러올 수 없습니다.</td></tr>`;
+      return;
+    }
+    const data = await r.json();
+    currentOffset = offset;
+    currentLimit  = limit;
+    currentTotal  = data.total;
+    renderLogs(data);
+  } catch (e) {
+    showError(errEl, '요청 실패: ' + e.message);
+    document.getElementById('logsTableBody').innerHTML = `<tr><td colspan="6" class="logs-empty">백엔드 서버에 연결할 수 없습니다.</td></tr>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> 새로고침';
+  }
+};
+
+function renderLogs(data) {
+  const tbody  = document.getElementById('logsTableBody');
+  const total  = document.getElementById('logsTotalBadge');
+  const pgInfo = document.getElementById('paginationInfo');
+  const prev   = document.getElementById('prevBtn');
+  const next   = document.getElementById('nextBtn');
+
+  total.textContent = `— ${data.total.toLocaleString()}건`;
+
+  if (!data.logs || data.logs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="logs-empty">로그가 없습니다.</td></tr>`;
+    pgInfo.textContent = '결과 없음';
+    prev.disabled = true;
+    next.disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = data.logs.map((l, i) => {
+    const protoCell = l.protocol
+      ? `<span class="proto-badge" data-p="${esc(l.protocol)}">${esc(l.protocol)}</span>`
+      : '<span class="proto-badge proto-badge-neutral">—</span>';
+    const eventCls = 'event-' + (l.eventType || 'COMPLETED');
+    return `<tr>
+      <td style="color:var(--text3)">${currentOffset + i + 1}</td>
+      <td><span class="log-reqid" title="${esc(l.requestId)}" onclick="jumpToId('${esc(l.requestId)}')">${esc((l.requestId||'').slice(0,8))}…</span></td>
+      <td>${protoCell}</td>
+      <td><span class="event-tag ${eventCls}">${esc(l.eventType || '—')}</span></td>
+      <td class="log-detail">${esc(l.eventDetail ?? '—')}</td>
+      <td class="ts-cell">${fmtTs(l.timestamp)}</td>
+    </tr>`;
+  }).join('');
+
+  const from = currentOffset + 1;
+  const to   = Math.min(currentOffset + data.logs.length, currentTotal);
+  pgInfo.textContent = `${from}–${to} / 전체 ${currentTotal.toLocaleString()}건`;
+  prev.disabled = currentOffset <= 0;
+  next.disabled = (currentOffset + currentLimit) >= currentTotal;
+}
+
+window.logsPage = function(dir) {
+  const newOffset = currentOffset + dir * currentLimit;
+  if (newOffset < 0 || newOffset >= currentTotal) return;
+  fetchLogs(newOffset);
+};
+
+window.jumpToId = function(id) {
+  document.getElementById('requestIdInput').value = id;
+  fetchStatus();
+  // scroll to result panel
+  document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// ── Seed ────────────────────────────────────────────────────────────────────
+const SEED_SCENARIOS = [
+  { protocols: ['SOAP','KAFKA','SFTP','BATCH','REST'], payload: { customerId: 'seed-001', amount: 10000, currency: 'KRW' } },
+  { protocols: ['REST','KAFKA'],                       payload: { customerId: 'seed-002', amount: 25000, currency: 'USD' } },
+  { protocols: ['SOAP','SFTP'],                        payload: { customerId: 'seed-003', amount: 50000, currency: 'EUR' } },
+  { protocols: ['BATCH'],                              payload: { customerId: 'seed-004', amount: 100,   currency: 'KRW', batchJob: 'nightly' } },
+  { protocols: ['KAFKA','REST','SOAP'],                payload: { customerId: 'seed-005', amount: 77777, currency: 'KRW', note: 'seed' } },
+];
+
+window.runSeed = async function() {
+  const btn = document.getElementById('seedBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">↻</span> 실행 중... (5건)';
+  let ok = 0;
+  for (const s of SEED_SCENARIOS) {
+    try {
+      const r = await fetch(`${BASE}/api/integrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(s),
+      });
+      if (r.ok) ok++;
+    } catch { /* ignore */ }
+  }
+  fetchLogs();
+  btn.innerHTML = `✓ ${ok}/${SEED_SCENARIOS.length}건 전송됨`;
+  setTimeout(() => {
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M2 12h20"/></svg> 샘플 요청 5건 실행<span class="btn-seed-note"> · Kafka/SFTP/Batch 실행됨</span>';
+    btn.disabled = false;
+  }, 3500);
+};
+
+// ── Auto-load logs on page load ────────────────────────────────────────────
+fetchLogs();
+</script>
+</body>
+</html>
