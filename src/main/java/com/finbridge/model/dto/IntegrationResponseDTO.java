@@ -21,5 +21,9 @@ public class IntegrationResponseDTO {
     // 프로토콜별 실행 결과 (예: { "SOAP": {...}, "KAFKA": {...} })
     private Map<String, ProtocolResultDTO> results;
 
-    private LocalDateTime timestamp;
+    // 요청 생성 시각
+    private LocalDateTime createdAt;
+
+    // 모든 요청 프로토콜 처리 완료 시각
+    private LocalDateTime completedAt;
 }

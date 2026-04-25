@@ -115,7 +115,7 @@ class IntegrationControllerTest {
         @DisplayName("소문자 프로토콜은 대소문자 정규화 후 정상 처리되어 200을 반환한다")
         void lowercaseProtocol_normalizedAndReturns200() throws Exception {
             IntegrationResponseDTO dto = new IntegrationResponseDTO(
-                    "id-1", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now());
+                    "id-1", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now(), LocalDateTime.now());
             when(integrationService.processIntegration(any())).thenReturn(dto);
 
             mockMvc.perform(post("/api/integrate")
@@ -129,7 +129,7 @@ class IntegrationControllerTest {
         @DisplayName("유효한 protocols 목록이면 200과 requestId를 반환한다")
         void validProtocols_returns200WithRequestId() throws Exception {
             IntegrationResponseDTO dto = new IntegrationResponseDTO(
-                    "id-2", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now());
+                    "id-2", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now(), LocalDateTime.now());
             when(integrationService.processIntegration(any())).thenReturn(dto);
 
             mockMvc.perform(post("/api/integrate")
@@ -143,7 +143,7 @@ class IntegrationControllerTest {
         @DisplayName("5개 프로토콜 모두 지정해도 200을 반환한다")
         void allFiveProtocols_returns200() throws Exception {
             IntegrationResponseDTO dto = new IntegrationResponseDTO(
-                    "id-3", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now());
+                    "id-3", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now(), LocalDateTime.now());
             when(integrationService.processIntegration(any())).thenReturn(dto);
 
             mockMvc.perform(post("/api/integrate")
@@ -166,7 +166,7 @@ class IntegrationControllerTest {
         @DisplayName("존재하는 requestId이면 200과 DTO를 반환한다")
         void existingId_returns200() throws Exception {
             IntegrationResponseDTO dto = new IntegrationResponseDTO(
-                    "abc-123", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now());
+                    "abc-123", OverallStatus.ALL_SUCCESS, Map.of(), LocalDateTime.now(), LocalDateTime.now());
             when(integrationService.getStatus("abc-123")).thenReturn(Optional.of(dto));
 
             mockMvc.perform(get("/api/integrate/abc-123"))

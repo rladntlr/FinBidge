@@ -50,6 +50,10 @@ sftp:
 server:
   port: 8080
 
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8080}
+
 logging:
   level:
     com.finbridge: DEBUG

@@ -29,6 +29,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -57,6 +58,7 @@ public class IntegrationService {
     private final RestAdapterService restAdapterService;
     private final ObjectMapper objectMapper;
     private final ExecutorService integrationTaskExecutor;
+    private final TransactionTemplate transactionTemplate;
 
     /**
      * @Transactional: 요청 저장부터 완료 저장까지 하나의 트랜잭션으로 묶는다.
@@ -70,25 +72,8 @@ public class IntegrationService {
         String requestId = UUID.randomUUID().toString();
         log.info("[INTEGRATION] 요청 시작: requestId={}, protocols={}", requestId, request.getProtocols());
 
-        // [2] integration_requests 저장 (CREATED)
-        IntegrationRequest entity = new IntegrationRequest();
-        entity.setRequestId(requestId);
-        entity.setProtocolsRequested(String.join(",", request.getProtocols()));
-        entity.setStatus(RequestStatus.CREATED);
-        try {
-            entity.setPayload(objectMapper.writeValueAsString(request.getPayload()));
-        } catch (Exception e) {
-            entity.setPayload(request.getPayload().toString());
-        }
-        integrationRequestRepository.save(entity);
-
-        // [3] SystemLog: INITIATED
-        saveLog(requestId, null, EventType.INITIATED,
-                "통합 요청 시작: " + request.getProtocols());
-
-        // [4] 상태: PROCESSING
-        entity.setStatus(RequestStatus.PROCESSING);
-        integrationRequestRepository.save(entity);
+        // [2-4] integration_requests 저장 + 시작 로그 저장
+        IntegrationRequest entity = createInitialRequest(requestId, request);
 
         // [5] 프로토콜 병렬 실행
         Map<String, CompletableFuture<ProtocolResultDTO>> futures = new HashMap<>();
@@ -142,30 +127,20 @@ public class IntegrationService {
             }
         }
 
-        results.forEach((protocol, result) -> {
-            ProtocolType protocolType = ProtocolType.valueOf(protocol);
-            saveProtocolResult(requestId, protocolType, result);
-            saveLog(requestId, protocolType, toEventType(result),
-                    protocol + " 처리 결과: " + result.getStatus());
-        });
-
         // [7-8] 전체 상태 판정
         OverallStatus overallStatus = determineOverallStatus(results);
 
-        // [9] integration_requests 업데이트 (COMPLETED)
-        entity.setStatus(RequestStatus.COMPLETED);
-        entity.setOverallStatus(overallStatus);
-        entity.setCompletedAt(LocalDateTime.now());
-        integrationRequestRepository.save(entity);
-
-        // [10] SystemLog: SUCCESS or FAILED
-        EventType finalEvent = overallStatus == OverallStatus.ALL_FAILED
-                ? EventType.FAILED : EventType.SUCCESS;
-        saveLog(requestId, null, finalEvent,
-                "통합 요청 완료: " + overallStatus);
+        // [9-10] 프로토콜 결과 + 완료 상태 저장
+        CompletionTimes completionTimes = saveFinalResults(entity, results, overallStatus);
 
         log.info("[INTEGRATION] {} 완료: {}", requestId, overallStatus);
-        return new IntegrationResponseDTO(requestId, overallStatus, results, entity.getCreatedAt());
+        return new IntegrationResponseDTO(
+                requestId,
+                overallStatus,
+                results,
+                completionTimes.createdAt(),
+                completionTimes.completedAt()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -186,8 +161,66 @@ public class IntegrationService {
         }
 
         return Optional.of(new IntegrationResponseDTO(
-                requestId, entity.getOverallStatus(), resultMap, entity.getCreatedAt()));
+                requestId,
+                entity.getOverallStatus(),
+                resultMap,
+                entity.getCreatedAt(),
+                entity.getCompletedAt()
+        ));
     }
+
+    private IntegrationRequest createInitialRequest(String requestId, IntegrationRequestDTO request) {
+        return transactionTemplate.execute(status -> {
+            IntegrationRequest entity = new IntegrationRequest();
+            entity.setRequestId(requestId);
+            entity.setProtocolsRequested(String.join(",", request.getProtocols()));
+            entity.setStatus(RequestStatus.CREATED);
+            try {
+                entity.setPayload(objectMapper.writeValueAsString(request.getPayload()));
+            } catch (Exception e) {
+                entity.setPayload(String.valueOf(request.getPayload()));
+            }
+            integrationRequestRepository.save(entity);
+
+            saveLog(requestId, null, EventType.INITIATED,
+                    "통합 요청 시작: " + request.getProtocols());
+
+            entity.setStatus(RequestStatus.PROCESSING);
+            integrationRequestRepository.save(entity);
+            return entity;
+        });
+    }
+
+    private CompletionTimes saveFinalResults(
+            IntegrationRequest entity,
+            Map<String, ProtocolResultDTO> results,
+            OverallStatus overallStatus
+    ) {
+        return transactionTemplate.execute(status -> {
+            String requestId = entity.getRequestId();
+
+            results.forEach((protocol, result) -> {
+                ProtocolType protocolType = ProtocolType.valueOf(protocol);
+                saveProtocolResult(requestId, protocolType, result);
+                saveLog(requestId, protocolType, toEventType(result),
+                        protocol + " 처리 결과: " + result.getStatus());
+            });
+
+            entity.setStatus(RequestStatus.COMPLETED);
+            entity.setOverallStatus(overallStatus);
+            entity.setCompletedAt(LocalDateTime.now());
+            integrationRequestRepository.save(entity);
+
+            EventType finalEvent = overallStatus == OverallStatus.ALL_FAILED
+                    ? EventType.FAILED : EventType.SUCCESS;
+            saveLog(requestId, null, finalEvent,
+                    "통합 요청 완료: " + overallStatus);
+
+            return new CompletionTimes(entity.getCreatedAt(), entity.getCompletedAt());
+        });
+    }
+
+    private record CompletionTimes(LocalDateTime createdAt, LocalDateTime completedAt) {}
 
     private OverallStatus determineOverallStatus(Map<String, ProtocolResultDTO> results) {
         if (results.isEmpty()) return OverallStatus.ALL_FAILED;

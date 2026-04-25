@@ -84,6 +84,7 @@ curl -s -X POST 'http://localhost:8080/api/integrate' \
 ```
 
 정상 응답은 `overallStatus`가 `ALL_SUCCESS`이고, `results`에 5개 프로토콜 결과가 포함됩니다.
+응답 시간 필드는 `createdAt`(요청 생성 시각), `completedAt`(전체 프로토콜 처리 완료 시각)으로 분리되어 있습니다.
 
 ### 상태 조회
 
@@ -145,3 +146,13 @@ Docker Compose 기준 로컬 데모 계정입니다.
 | SFTP user | `finbridge` |
 | SFTP password | `finbridge123` |
 | SFTP upload dir | `/upload` |
+
+## 운영 전 설정
+
+로컬 데모 기본값은 바로 실행할 수 있도록 잡혀 있지만, 배포 환경에서는 아래 값을 환경변수로 분리해서 사용하세요.
+
+| 환경변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:8080` | API를 호출할 프론트엔드 origin 목록. 여러 개는 쉼표로 구분 |
+| `SFTP_PASSWORD` | `finbridge123` | SFTP 접속 비밀번호 |
+| `SFTP_HOST` / `SFTP_PORT` | `localhost` / `2222` | SFTP 서버 위치 |

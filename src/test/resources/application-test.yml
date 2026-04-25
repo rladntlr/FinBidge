@@ -46,6 +46,10 @@ sftp:
   strict-host-key-checking: "no"
   known-hosts: ""
 
+app:
+  cors:
+    allowed-origins: http://localhost:8080
+
 logging:
   level:
     com.finbridge: WARN
