@@ -44,6 +44,8 @@ sftp:
   username: finbridge
   password: finbridge123
   upload-dir: /upload
+  strict-host-key-checking: "yes"
+  known-hosts: ${user.home}/.ssh/known_hosts
 
 server:
   port: 8080

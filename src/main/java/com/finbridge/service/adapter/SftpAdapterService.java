@@ -38,6 +38,12 @@ public class SftpAdapterService implements ProtocolAdapter {
     @Value("${sftp.upload-dir}")
     private String uploadDir;
 
+    @Value("${sftp.strict-host-key-checking:yes}")
+    private String strictHostKeyChecking;
+
+    @Value("${sftp.known-hosts:}")
+    private String knownHosts;
+
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
         long startTime = System.currentTimeMillis();
@@ -52,16 +58,23 @@ public class SftpAdapterService implements ProtocolAdapter {
             byte[] content = json.getBytes(StandardCharsets.UTF_8);
 
             JSch jsch = new JSch();
+            if ("yes".equalsIgnoreCase(strictHostKeyChecking)) {
+                if (knownHosts == null || knownHosts.isBlank()) {
+                    throw new IllegalStateException("sftp.known-hosts 설정이 필요합니다.");
+                }
+                jsch.setKnownHosts(knownHosts);
+            }
+
             session = jsch.getSession(username, host, port);
             session.setPassword(password);
 
             Properties config = new Properties();
-            config.put("StrictHostKeyChecking", "no");
+            config.put("StrictHostKeyChecking", strictHostKeyChecking);
             session.setConfig(config);
             session.connect(10_000);
 
             channel = (ChannelSftp) session.openChannel("sftp");
-            channel.connect();
+            channel.connect(10_000);
             channel.put(new ByteArrayInputStream(content), uploadDir + "/" + filename);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;

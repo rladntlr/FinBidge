@@ -28,9 +28,11 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -47,6 +49,7 @@ public class IntegrationService {
     private final BatchAdapterService batchAdapterService;
     private final RestAdapterService restAdapterService;
     private final ObjectMapper objectMapper;
+    private final ExecutorService integrationTaskExecutor;
 
     public IntegrationResponseDTO processIntegration(IntegrationRequestDTO request) {
         // [1] request_id 생성
@@ -78,23 +81,23 @@ public class IntegrationService {
 
         if (request.getProtocols().contains("SOAP")) {
             futures.put("SOAP", CompletableFuture.supplyAsync(
-                    () -> soapAdapterService.execute(requestId, request.getPayload())));
+                    () -> soapAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("KAFKA")) {
             futures.put("KAFKA", CompletableFuture.supplyAsync(
-                    () -> kafkaAdapterService.execute(requestId, request.getPayload())));
+                    () -> kafkaAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("SFTP")) {
             futures.put("SFTP", CompletableFuture.supplyAsync(
-                    () -> sftpAdapterService.execute(requestId, request.getPayload())));
+                    () -> sftpAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("BATCH")) {
             futures.put("BATCH", CompletableFuture.supplyAsync(
-                    () -> batchAdapterService.execute(requestId, request.getPayload())));
+                    () -> batchAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
         if (request.getProtocols().contains("REST")) {
             futures.put("REST", CompletableFuture.supplyAsync(
-                    () -> restAdapterService.execute(requestId, request.getPayload())));
+                    () -> restAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
         }
 
         // [6] 전체 완료 대기 (35초 timeout)
@@ -151,13 +154,12 @@ public class IntegrationService {
         return new IntegrationResponseDTO(requestId, overallStatus, results, LocalDateTime.now());
     }
 
-    public IntegrationResponseDTO getStatus(String requestId) {
-        IntegrationRequest entity = integrationRequestRepository.findByRequestId(requestId)
-                .orElse(null);
-
-        if (entity == null) {
-            return null;
+    public Optional<IntegrationResponseDTO> getStatus(String requestId) {
+        Optional<IntegrationRequest> entityOptional = integrationRequestRepository.findByRequestId(requestId);
+        if (entityOptional.isEmpty()) {
+            return Optional.empty();
         }
+        IntegrationRequest entity = entityOptional.get();
 
         List<ProtocolResult> protocolResults = protocolResultRepository.findByRequestId(requestId);
         Map<String, ProtocolResultDTO> resultMap = new HashMap<>();
@@ -168,8 +170,8 @@ public class IntegrationService {
                     r.getResponseMessage(), r.getExecutionTimeMs()));
         }
 
-        return new IntegrationResponseDTO(
-                requestId, entity.getOverallStatus(), resultMap, entity.getCreatedAt());
+        return Optional.of(new IntegrationResponseDTO(
+                requestId, entity.getOverallStatus(), resultMap, entity.getCreatedAt()));
     }
 
     private OverallStatus determineOverallStatus(Map<String, ProtocolResultDTO> results) {

@@ -1,5 +1,6 @@
 package com.finbridge.service.adapter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finbridge.config.KafkaConfig;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.enums.ResultStatus;
@@ -18,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 public class KafkaAdapterService implements ProtocolAdapter {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper;
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
@@ -25,7 +27,7 @@ public class KafkaAdapterService implements ProtocolAdapter {
         log.info("[KAFKA] {} - 메시지 발행 시작", requestId);
 
         try {
-            String message = requestId + "|" + payload.toString();
+            String message = requestId + "|" + objectMapper.writeValueAsString(payload);
 
             CompletableFuture<SendResult<String, String>> future =
                     kafkaTemplate.send(KafkaConfig.INTEGRATION_TOPIC, requestId, message);

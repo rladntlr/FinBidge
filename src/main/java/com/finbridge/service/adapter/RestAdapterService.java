@@ -2,10 +2,10 @@ package com.finbridge.service.adapter;
 
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.enums.ResultStatus;
+import com.finbridge.service.legacy.LegacyRestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
 
@@ -14,21 +14,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RestAdapterService implements ProtocolAdapter {
 
-    private final WebClient.Builder webClientBuilder;
+    private final LegacyRestService legacyRestService;
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
         long startTime = System.currentTimeMillis();
-        log.info("[REST] {} - 외부 REST 시스템 호출 시작", requestId);
+        log.info("[REST] {} - REST 레거시 처리 시작", requestId);
 
         try {
-            Map<?, ?> response = webClientBuilder.build()
-                    .post()
-                    .uri("http://localhost:8080/internal/echo")
-                    .bodyValue(payload)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
+            Map<String, Object> response = legacyRestService.echo(payload);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
             String message = response != null ? (String) response.get("message") : "응답 없음";
