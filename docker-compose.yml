@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -55,6 +53,12 @@ services:
       - "2222:22"
     volumes:
       - sftp_data:/home/finbridge/upload
+      # Fixed demo host keys keep localhost:2222 stable across container recreation.
+      - ./docker/sftp/host_keys/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key
+      - ./docker/sftp/host_keys/ssh_host_ed25519_key.pub:/etc/ssh/ssh_host_ed25519_key.pub
+      - ./docker/sftp/host_keys/ssh_host_rsa_key:/etc/ssh/ssh_host_rsa_key
+      - ./docker/sftp/host_keys/ssh_host_rsa_key.pub:/etc/ssh/ssh_host_rsa_key.pub
+      - ./docker/sftp/init.d:/etc/sftp.d:ro
     networks:
       - finbridge-network
 
