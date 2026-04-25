@@ -3,6 +3,8 @@ package com.finbridge.controller;
 import com.finbridge.model.dto.IntegrationRequestDTO;
 import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.LogResponseDTO;
+import com.finbridge.model.dto.RetryRequestDTO;
+import com.finbridge.model.dto.RetryResponseDTO;
 import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.service.IntegrationService;
 import lombok.RequiredArgsConstructor;
@@ -31,32 +33,53 @@ public class IntegrationController {
     // POST /api/integrate
     @PostMapping("/integrate")
     public ResponseEntity<?> integrate(@RequestBody IntegrationRequestDTO request) {
-        if (request.getProtocols() == null || request.getProtocols().isEmpty()) {
+        List<String> normalizedProtocols = normalizeProtocols(request.getProtocols());
+        if (normalizedProtocols == null) {
             return ResponseEntity.badRequest().body("protocols 목록이 비어 있습니다.");
         }
-
-        List<String> normalizedProtocols = request.getProtocols().stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(p -> !p.isBlank())
-                .map(p -> p.toUpperCase(Locale.ROOT))
-                .collect(Collectors.toList());
-        if (normalizedProtocols.size() != request.getProtocols().size() || normalizedProtocols.isEmpty()) {
+        if (normalizedProtocols.isEmpty()) {
             return ResponseEntity.badRequest().body("protocols에는 null 또는 빈 값이 포함될 수 없습니다.");
         }
 
-        List<String> invalid = normalizedProtocols.stream()
-                .filter(p -> !SUPPORTED_PROTOCOLS.contains(p))
-                .collect(Collectors.toList());
-        if (!invalid.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body("지원하지 않는 프로토콜: " + invalid + ". 지원 목록: " + SUPPORTED_PROTOCOLS);
+        ResponseEntity<?> validationError = validateSupportedProtocols(normalizedProtocols);
+        if (validationError != null) {
+            return validationError;
         }
         request.setProtocols(normalizedProtocols);
 
         log.info("[API] POST /api/integrate - protocols={}", request.getProtocols());
         IntegrationResponseDTO response = integrationService.processIntegration(request);
         return ResponseEntity.ok(response);
+    }
+
+    // POST /api/integrate/{requestId}/retry
+    @PostMapping("/integrate/{requestId}/retry")
+    public ResponseEntity<?> retry(
+            @PathVariable String requestId,
+            @RequestBody(required = false) RetryRequestDTO request) {
+
+        List<String> normalizedProtocols = null;
+        if (request != null && request.getProtocols() != null && !request.getProtocols().isEmpty()) {
+            normalizedProtocols = normalizeProtocols(request.getProtocols());
+            if (normalizedProtocols == null || normalizedProtocols.isEmpty()) {
+                return ResponseEntity.badRequest().body("protocols에는 null 또는 빈 값이 포함될 수 없습니다.");
+            }
+
+            ResponseEntity<?> validationError = validateSupportedProtocols(normalizedProtocols);
+            if (validationError != null) {
+                return validationError;
+            }
+        }
+
+        log.info("[API] POST /api/integrate/{}/retry - protocols={}", requestId, normalizedProtocols);
+        try {
+            Optional<RetryResponseDTO> response =
+                    integrationService.retryIntegration(requestId, normalizedProtocols);
+            return response.map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // GET /api/integrate/{requestId}
@@ -93,5 +116,33 @@ public class IntegrationController {
         }
 
         return ResponseEntity.ok(integrationService.getLogs(protocolType, limit, offset));
+    }
+
+    private List<String> normalizeProtocols(List<String> protocols) {
+        if (protocols == null || protocols.isEmpty()) {
+            return null;
+        }
+
+        List<String> normalizedProtocols = protocols.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(p -> !p.isBlank())
+                .map(p -> p.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toList());
+        if (normalizedProtocols.size() != protocols.size()) {
+            return List.of();
+        }
+        return normalizedProtocols;
+    }
+
+    private ResponseEntity<?> validateSupportedProtocols(List<String> protocols) {
+        List<String> invalid = protocols.stream()
+                .filter(p -> !SUPPORTED_PROTOCOLS.contains(p))
+                .collect(Collectors.toList());
+        if (invalid.isEmpty()) {
+            return null;
+        }
+        return ResponseEntity.badRequest()
+                .body("지원하지 않는 프로토콜: " + invalid + ". 지원 목록: " + SUPPORTED_PROTOCOLS);
     }
 }

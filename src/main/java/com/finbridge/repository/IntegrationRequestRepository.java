@@ -1,6 +1,7 @@
 package com.finbridge.repository;
 
 import com.finbridge.model.entity.IntegrationRequest;
+import com.finbridge.model.enums.OverallStatus;
 import com.finbridge.model.enums.RequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -14,4 +15,8 @@ public interface IntegrationRequestRepository extends JpaRepository<IntegrationR
     Optional<IntegrationRequest> findByRequestId(String requestId);
 
     List<IntegrationRequest> findByStatus(RequestStatus status);
+
+    long countByStatus(RequestStatus status);
+
+    long countByOverallStatus(OverallStatus overallStatus);
 }

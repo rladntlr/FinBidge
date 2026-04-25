@@ -1,6 +1,7 @@
 package com.finbridge.service.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finbridge.model.dto.AdapterExecutionConfig;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.enums.ResultStatus;
 import com.jcraft.jsch.ChannelSftp;
@@ -46,9 +47,21 @@ public class SftpAdapterService implements ProtocolAdapter {
 
     @Override
     public ProtocolResultDTO execute(String requestId, Map<String, Object> payload) {
+        return execute(requestId, payload, null);
+    }
+
+    @Override
+    public ProtocolResultDTO execute(
+            String requestId,
+            Map<String, Object> payload,
+            AdapterExecutionConfig config
+    ) {
         long startTime = System.currentTimeMillis();
         String filename = "finbridge-" + requestId + ".json";
-        log.info("[SFTP] {} - 파일 업로드 시작: {}", requestId, filename);
+        String targetUploadDir = endpointOrDefault(config, uploadDir);
+        int timeoutMs = timeoutOrDefault(config, 10_000);
+        log.info("[SFTP] {} - 파일 업로드 시작: {}, uploadDir={}, timeoutMs={}",
+                requestId, filename, targetUploadDir, timeoutMs);
 
         Session session = null;
         ChannelSftp channel = null;
@@ -68,20 +81,20 @@ public class SftpAdapterService implements ProtocolAdapter {
             session = jsch.getSession(username, host, port);
             session.setPassword(password);
 
-            Properties config = new Properties();
-            config.put("StrictHostKeyChecking", strictHostKeyChecking);
-            session.setConfig(config);
-            session.connect(10_000);
+            Properties sessionConfig = new Properties();
+            sessionConfig.put("StrictHostKeyChecking", strictHostKeyChecking);
+            session.setConfig(sessionConfig);
+            session.connect(timeoutMs);
 
             channel = (ChannelSftp) session.openChannel("sftp");
-            channel.connect(10_000);
-            channel.put(new ByteArrayInputStream(content), uploadDir + "/" + filename);
+            channel.connect(timeoutMs);
+            channel.put(new ByteArrayInputStream(content), targetUploadDir + "/" + filename);
 
             long executionTimeMs = System.currentTimeMillis() - startTime;
             log.info("[SFTP] {} - 업로드 성공: {} ({}ms)", requestId, filename, executionTimeMs);
 
             return new ProtocolResultDTO(ResultStatus.SUCCESS, "200",
-                    "파일 업로드 완료: " + uploadDir + "/" + filename, executionTimeMs);
+                    "파일 업로드 완료: " + targetUploadDir + "/" + filename, executionTimeMs);
 
         } catch (Exception e) {
             long executionTimeMs = System.currentTimeMillis() - startTime;
@@ -93,5 +106,17 @@ public class SftpAdapterService implements ProtocolAdapter {
             if (channel != null && channel.isConnected()) channel.disconnect();
             if (session != null && session.isConnected()) session.disconnect();
         }
+    }
+
+    private String endpointOrDefault(AdapterExecutionConfig config, String defaultEndpoint) {
+        return config != null && config.getEndpoint() != null && !config.getEndpoint().isBlank()
+                ? config.getEndpoint()
+                : defaultEndpoint;
+    }
+
+    private int timeoutOrDefault(AdapterExecutionConfig config, int defaultTimeoutMs) {
+        return config != null && config.getTimeoutMs() != null && config.getTimeoutMs() > 0
+                ? config.getTimeoutMs()
+                : defaultTimeoutMs;
     }
 }

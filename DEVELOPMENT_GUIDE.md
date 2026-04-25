@@ -327,6 +327,30 @@ return Executors.newFixedThreadPool(10, threadFactory);
 
 외부 어댑터 실행은 트랜잭션 밖에서 수행된다.
 
+요청에 포함된 프로토콜만 future에 추가된다.
+
+### 4.2 integrationTaskExecutor
+
+`IntegrationExecutorConfig`에서 별도 ExecutorService를 등록한다.
+
+```java
+return Executors.newFixedThreadPool(10, threadFactory);
+```
+
+스레드 이름은 `integration-adapter-1`, `integration-adapter-2` 형식이다. 장애 분석 시 스레드 덤프에서 통합 어댑터 작업을 구분하기 쉽다.
+
+### 4.3 35초 timeout
+
+`CompletableFuture.allOf(...).orTimeout(35, TimeUnit.SECONDS)`를 사용한다.
+
+동작:
+
+- 모든 future가 35초 안에 끝나면 각 결과를 수집한다.
+- 아직 끝나지 않은 future는 `TIMEOUT`, `504`, `35초 내 응답 없음` 결과로 변환한다.
+- 이미 끝났지만 예외가 발생한 future는 `FAILED`, `500` 결과로 변환한다.
+
+이 설계는 API 응답과 DB 저장 결과를 `IntegrationService`에서 한 번만 확정하기 위한 구조다.
+
 ---
 
 ## 6. 결과 저장 책임
