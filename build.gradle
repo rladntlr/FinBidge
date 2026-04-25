@@ -55,8 +55,9 @@ dependencies {
     implementation 'jakarta.xml.bind:jakarta.xml.bind-api'
     runtimeOnly 'com.sun.xml.bind:jaxb-impl:4.0.5'
 
-    // JSch (SFTP)
-    implementation 'com.jcraft:jsch:0.1.55'
+    // JSch (SFTP) — 활발히 유지보수되는 포크로 교체 (com.jcraft:jsch:0.1.55 는 2018년 이후 방치)
+    // 최신 버전: https://central.sonatype.com/artifact/com.github.mwiede/jsch
+    implementation 'com.github.mwiede:jsch:0.2.22'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

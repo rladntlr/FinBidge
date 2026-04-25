@@ -39,11 +39,11 @@ spring:
       enabled: false
 
 sftp:
-  host: localhost
-  port: 2222
-  username: finbridge
-  password: finbridge123
-  upload-dir: /upload
+  host: ${SFTP_HOST:localhost}
+  port: ${SFTP_PORT:2222}
+  username: ${SFTP_USERNAME:finbridge}
+  password: ${SFTP_PASSWORD:finbridge123}  # 운영 환경에서는 반드시 환경변수로 주입할 것
+  upload-dir: ${SFTP_UPLOAD_DIR:/upload}
   strict-host-key-checking: "yes"
   known-hosts: ${user.home}/.ssh/known_hosts
 

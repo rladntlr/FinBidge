@@ -3,16 +3,10 @@ package com.finbridge.controller;
 import com.finbridge.model.dto.IntegrationRequestDTO;
 import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.LogResponseDTO;
-import com.finbridge.model.entity.SystemLog;
 import com.finbridge.model.enums.ProtocolType;
-import com.finbridge.repository.SystemLogRepository;
 import com.finbridge.service.IntegrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.AbstractPageRequest;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,12 +27,10 @@ public class IntegrationController {
             Set.of("SOAP", "KAFKA", "SFTP", "BATCH", "REST");
 
     private final IntegrationService integrationService;
-    private final SystemLogRepository systemLogRepository;
 
     // POST /api/integrate
     @PostMapping("/integrate")
     public ResponseEntity<?> integrate(@RequestBody IntegrationRequestDTO request) {
-        // P2: null/빈 목록 또는 지원하지 않는 프로토콜 → 400 Bad Request
         if (request.getProtocols() == null || request.getProtocols().isEmpty()) {
             return ResponseEntity.badRequest().body("protocols 목록이 비어 있습니다.");
         }
@@ -60,7 +52,6 @@ public class IntegrationController {
             return ResponseEntity.badRequest()
                     .body("지원하지 않는 프로토콜: " + invalid + ". 지원 목록: " + SUPPORTED_PROTOCOLS);
         }
-        // 대소문자 정규화 후 처리
         request.setProtocols(normalizedProtocols);
 
         log.info("[API] POST /api/integrate - protocols={}", request.getProtocols());
@@ -70,9 +61,7 @@ public class IntegrationController {
 
     // GET /api/integrate/{requestId}
     @GetMapping("/integrate/{requestId}")
-    public ResponseEntity<IntegrationResponseDTO> getStatus(
-            @PathVariable String requestId) {
-
+    public ResponseEntity<IntegrationResponseDTO> getStatus(@PathVariable String requestId) {
         log.info("[API] GET /api/integrate/{}", requestId);
         Optional<IntegrationResponseDTO> response = integrationService.getStatus(requestId);
         return response.map(ResponseEntity::ok)
@@ -93,83 +82,16 @@ public class IntegrationController {
                     .body(new LogResponseDTO(0L, limit, offset, List.of()));
         }
 
-        Pageable pageable = new OffsetBasedPageRequest(offset, limit, Sort.by("timestamp").descending());
-        Page<SystemLog> page;
-
+        ProtocolType protocolType = null;
         if (protocol != null && !protocol.isBlank()) {
-            // I7: 잘못된 protocol 값은 500 대신 400 반환
-            ProtocolType protocolType;
             try {
                 protocolType = ProtocolType.valueOf(protocol.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest()
                         .body(new LogResponseDTO(0L, limit, offset, List.of()));
             }
-            page = systemLogRepository.findByProtocol(protocolType, pageable);
-        } else {
-            page = systemLogRepository.findAll(pageable);
         }
 
-        long total = page.getTotalElements();
-
-        List<LogResponseDTO.LogItem> logItems = page.getContent().stream()
-                .map(l -> new LogResponseDTO.LogItem(
-                        l.getId(),
-                        l.getRequestId(),
-                        l.getProtocol() != null ? l.getProtocol().name() : null,
-                        l.getEventType().name(),
-                        l.getEventDetail(),
-                        l.getTimestamp()
-                ))
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(new LogResponseDTO(total, limit, offset, logItems));
-    }
-
-    private static class OffsetBasedPageRequest extends AbstractPageRequest {
-
-        private final long offset;
-        private final Sort sort;
-
-        private OffsetBasedPageRequest(long offset, int limit, Sort sort) {
-            super((int) (offset / limit), limit);
-            if (offset < 0) {
-                throw new IllegalArgumentException("Offset must not be negative");
-            }
-            this.offset = offset;
-            this.sort = sort;
-        }
-
-        @Override
-        public long getOffset() {
-            return offset;
-        }
-
-        @Override
-        public Sort getSort() {
-            return sort;
-        }
-
-        @Override
-        public Pageable next() {
-            return new OffsetBasedPageRequest(offset + getPageSize(), getPageSize(), sort);
-        }
-
-        @Override
-        public Pageable previous() {
-            return hasPrevious()
-                    ? new OffsetBasedPageRequest(offset - getPageSize(), getPageSize(), sort)
-                    : this;
-        }
-
-        @Override
-        public Pageable first() {
-            return new OffsetBasedPageRequest(0, getPageSize(), sort);
-        }
-
-        @Override
-        public Pageable withPage(int pageNumber) {
-            return new OffsetBasedPageRequest((long) pageNumber * getPageSize(), getPageSize(), sort);
-        }
+        return ResponseEntity.ok(integrationService.getLogs(protocolType, limit, offset));
     }
 }
