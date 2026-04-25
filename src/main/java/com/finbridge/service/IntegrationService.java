@@ -7,6 +7,7 @@ import com.finbridge.model.dto.IntegrationResponseDTO;
 import com.finbridge.model.dto.LogResponseDTO;
 import com.finbridge.model.dto.ProtocolResultDTO;
 import com.finbridge.model.dto.RetryResponseDTO;
+import com.finbridge.model.entity.InterfaceConfig;
 import com.finbridge.model.entity.IntegrationRequest;
 import com.finbridge.model.entity.ProtocolResult;
 import com.finbridge.model.entity.SystemLog;
@@ -16,6 +17,7 @@ import com.finbridge.model.enums.ProtocolType;
 import com.finbridge.model.enums.RequestStatus;
 import com.finbridge.model.enums.ResultStatus;
 import com.finbridge.repository.IntegrationRequestRepository;
+import com.finbridge.repository.InterfaceConfigRepository;
 import com.finbridge.repository.ProtocolResultRepository;
 import com.finbridge.repository.SystemLogRepository;
 import com.finbridge.service.adapter.BatchAdapterService;
@@ -51,6 +53,7 @@ import java.util.stream.Collectors;
 public class IntegrationService {
 
     private final IntegrationRequestRepository integrationRequestRepository;
+    private final InterfaceConfigRepository interfaceConfigRepository;
     private final ProtocolResultRepository protocolResultRepository;
     private final SystemLogRepository systemLogRepository;
     private final SoapAdapterService soapAdapterService;
@@ -72,31 +75,30 @@ public class IntegrationService {
 
         // [5] 프로토콜 병렬 실행
         Map<String, CompletableFuture<ProtocolResultDTO>> futures = new HashMap<>();
+        Map<String, ProtocolResultDTO> results = new HashMap<>();
 
         if (request.getProtocols().contains("SOAP")) {
-            futures.put("SOAP", CompletableFuture.supplyAsync(
-                    () -> soapAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
+            scheduleIfEnabled(requestId, ProtocolType.SOAP, futures, results,
+                    () -> soapAdapterService.execute(requestId, request.getPayload()));
         }
         if (request.getProtocols().contains("KAFKA")) {
-            futures.put("KAFKA", CompletableFuture.supplyAsync(
-                    () -> kafkaAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
+            scheduleIfEnabled(requestId, ProtocolType.KAFKA, futures, results,
+                    () -> kafkaAdapterService.execute(requestId, request.getPayload()));
         }
         if (request.getProtocols().contains("SFTP")) {
-            futures.put("SFTP", CompletableFuture.supplyAsync(
-                    () -> sftpAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
+            scheduleIfEnabled(requestId, ProtocolType.SFTP, futures, results,
+                    () -> sftpAdapterService.execute(requestId, request.getPayload()));
         }
         if (request.getProtocols().contains("BATCH")) {
-            futures.put("BATCH", CompletableFuture.supplyAsync(
-                    () -> batchAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
+            scheduleIfEnabled(requestId, ProtocolType.BATCH, futures, results,
+                    () -> batchAdapterService.execute(requestId, request.getPayload()));
         }
         if (request.getProtocols().contains("REST")) {
-            futures.put("REST", CompletableFuture.supplyAsync(
-                    () -> restAdapterService.execute(requestId, request.getPayload()), integrationTaskExecutor));
+            scheduleIfEnabled(requestId, ProtocolType.REST, futures, results,
+                    () -> restAdapterService.execute(requestId, request.getPayload()));
         }
 
         // [6] 전체 완료 대기 (35초 timeout)
-        Map<String, ProtocolResultDTO> results = new HashMap<>();
-
         try {
             CompletableFuture.allOf(futures.values().toArray(new CompletableFuture[0]))
                     .orTimeout(35, TimeUnit.SECONDS)
@@ -260,6 +262,36 @@ public class IntegrationService {
             return result;
         }
         return new ProtocolResultDTO(ResultStatus.FAILED, "500", "프로토콜 결과 없음", 0L);
+    }
+
+    private void scheduleIfEnabled(
+            String requestId,
+            ProtocolType protocol,
+            Map<String, CompletableFuture<ProtocolResultDTO>> futures,
+            Map<String, ProtocolResultDTO> results,
+            java.util.function.Supplier<ProtocolResultDTO> task
+    ) {
+        String protocolName = protocol.name();
+        if (!isProtocolEnabled(protocol)) {
+            log.info("[INTEGRATION] {} - {} 비활성화로 Adapter 실행 생략", requestId, protocolName);
+            results.put(protocolName, new ProtocolResultDTO(
+                    ResultStatus.FAILED,
+                    "DISABLED",
+                    "비활성화된 인터페이스입니다.",
+                    0L
+            ));
+            return;
+        }
+
+        futures.put(protocolName, CompletableFuture.supplyAsync(task, integrationTaskExecutor));
+    }
+
+    private boolean isProtocolEnabled(ProtocolType protocol) {
+        List<InterfaceConfig> configs = interfaceConfigRepository.findByProtocol(protocol);
+        if (configs == null || configs.isEmpty()) {
+            return true;
+        }
+        return configs.stream().anyMatch(config -> Boolean.TRUE.equals(config.getEnabled()));
     }
 
     private List<String> resolveRetryProtocols(String originalRequestId, List<String> requestedProtocols) {
