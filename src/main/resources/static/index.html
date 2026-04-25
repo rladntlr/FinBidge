@@ -834,6 +834,8 @@ function hideError(el) { el.classList.remove('visible'); el.style.display = 'non
 // ── Render result ──────────────────────────────────────────────────────────
 function renderResultBody(data) {
   const results = data.results || {};
+  const createdAt = fmtTs(data.createdAt);
+  const completedAt = fmtTs(data.completedAt);
   const rows = Object.entries(results).map(([proto, r]) => `
     <tr>
       <td><span class="proto-cell" data-p="${esc(proto)}">${esc(proto)}</span></td>
@@ -858,7 +860,7 @@ function renderResultBody(data) {
       <tbody>${rows}</tbody>
     </table>
     <div class="divider"></div>
-    <div class="ts-footer">응답: ${fmtTs(data.timestamp)}</div>`;
+    <div class="ts-footer">생성: ${createdAt} · 완료: ${completedAt}</div>`;
 }
 
 function showResult(data) {

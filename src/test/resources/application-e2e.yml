@@ -41,6 +41,10 @@ sftp:
   strict-host-key-checking: "yes"
   known-hosts: ${user.home}/.ssh/known_hosts
 
+app:
+  cors:
+    allowed-origins: http://localhost:8080
+
 logging:
   level:
     com.finbridge: INFO
