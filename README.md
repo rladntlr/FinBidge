@@ -81,6 +81,8 @@ docker compose up -d
 
 SFTP는 `StrictHostKeyChecking=yes`로 동작합니다. 처음 실행하는 환경에서는 host key를 등록합니다.
 
+macOS/Linux:
+
 ```bash
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
@@ -89,7 +91,31 @@ ssh-keyscan -T 10 -p 2222 localhost >> "$HOME/.ssh/known_hosts"
 chmod 600 "$HOME/.ssh/known_hosts"
 ```
 
+Windows PowerShell에서는 직접 한 번 접속해 fingerprint를 등록해도 됩니다.
+
+```powershell
+sftp -P 2222 finbridge@localhost
+```
+
+처음 접속하면 아래 질문이 나오며, `yes`를 입력하면 Windows 사용자 홈의 `known_hosts`에 등록됩니다.
+
+```text
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+```
+
+비밀번호는 로컬 기본값 `finbridge123`입니다. 접속 확인 후 `sftp>` 프롬프트에서 `exit`로 나오면 됩니다.
+
 Docker Compose는 로컬 데모용 SFTP host key를 `docker/sftp/host_keys/`에 고정해 둡니다.
+
+기본 포트는 `2222`입니다. 로컬에서 포트 충돌 때문에 `22022:22`처럼 바꿨다면 위 명령의 포트도 `2222` 대신 `22022`를 사용하고, 애플리케이션 실행 시 `SFTP_PORT=22022`도 함께 설정해야 합니다.
+
+SFTP 컨테이너가 시작 직후 종료되면 `docker/sftp/init.d/fix-upload-permissions.sh` 줄바꿈이 CRLF인지 확인하세요. Docker init script는 LF여야 합니다. 이 저장소는 `.gitattributes`로 `*.sh`와 `docker/**` 파일을 LF로 고정합니다.
+
+```bash
+file docker/sftp/init.d/fix-upload-permissions.sh
+```
+
+`with CRLF line terminators`가 보이면 LF로 변환한 뒤 다시 실행하세요.
 
 ### 3. 애플리케이션 실행
 
@@ -207,6 +233,18 @@ RUN_DOCKER_E2E=true ./gradlew test --tests '*RealDockerE2EIT'
 ```bash
 ./gradlew bootJar
 ```
+
+## 로컬 데이터 초기화
+
+로컬 데모 중 쌓인 요청, 결과, 시스템 로그, Batch 메타데이터를 모두 초기화하려면 Docker volume을 삭제하고 다시 실행합니다.
+
+```bash
+docker compose down -v
+docker compose up -d
+./gradlew bootRun
+```
+
+이 명령은 MySQL 데이터까지 함께 삭제합니다. 제출/시연 전 깨끗한 상태로 다시 확인할 때 사용하세요.
 
 ## 운영 전 주의사항
 
