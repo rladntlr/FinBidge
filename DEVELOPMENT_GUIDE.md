@@ -316,6 +316,29 @@ return Executors.newFixedThreadPool(10, threadFactory);
 
 ### 5.2 실제 구현
 
+<div style="border:1px solid #dee2e6;border-radius:6px;padding:20px 20px 16px;margin:16px 0;background:#fafafa;">
+<p style="text-align:center;font-weight:bold;margin:0 0 16px;font-size:0.95em;">processIntegration() 트랜잭션 구조</p>
+<div style="display:flex;align-items:center;gap:10px;">
+<div style="flex:1;background:#d4edda;border:2px solid #28a745;border-radius:4px;padding:10px 12px;text-align:center;font-size:0.82em;">
+<div style="font-weight:bold;margin-bottom:4px;">TransactionTemplate</div>
+<div>createInitialRequest()</div>
+<div style="color:#555;margin-top:4px;">요청 저장 · 시작 로그 · PROCESSING</div>
+</div>
+<div style="font-size:1.5em;color:#aaa;flex-shrink:0;">→</div>
+<div style="flex:1.4;background:#fff8e1;border:2px dashed #f9a825;border-radius:4px;padding:10px 12px;text-align:center;font-size:0.82em;">
+<div style="font-weight:bold;margin-bottom:4px;">트랜잭션 없음</div>
+<div>어댑터 병렬 실행</div>
+<div style="color:#555;margin-top:4px;">최대 35초 · 외부 시스템 호출 · DB 커넥션 미점유</div>
+</div>
+<div style="font-size:1.5em;color:#aaa;flex-shrink:0;">→</div>
+<div style="flex:1;background:#d4edda;border:2px solid #28a745;border-radius:4px;padding:10px 12px;text-align:center;font-size:0.82em;">
+<div style="font-weight:bold;margin-bottom:4px;">TransactionTemplate</div>
+<div>saveFinalResults()</div>
+<div style="color:#555;margin-top:4px;">결과 저장 · 완료 로그 · COMPLETED</div>
+</div>
+</div>
+</div>
+
 짧은 DB 저장 구간만 `TransactionTemplate`으로 감싼다.
 
 | 메서드 | 트랜잭션 범위 |
@@ -809,6 +832,12 @@ PUT /api/interfaces/{id}
 ---
 
 ## 13. 테스트 전략
+
+| 유형 | 도구 | 특징 | 실행 |
+| --- | --- | --- | --- |
+| 단위 테스트 | JUnit 5, Mockito | 외부 의존성 없음, 빠름 | `./gradlew test` |
+| H2 통합 테스트 | Spring MVC, H2, Flyway off | API·DB 흐름 검증, Adapter mock | `./gradlew test` |
+| Docker E2E 테스트 | MySQL, Kafka, SFTP, Batch | 실제 연계 경로 전체 검증 | `RUN_DOCKER_E2E=true ./gradlew test --tests '*RealDockerE2EIT'` |
 
 ### 13.1 Unit Test
 

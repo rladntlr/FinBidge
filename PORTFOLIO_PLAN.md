@@ -36,6 +36,27 @@ FinBridge가 다루는 핵심 문제는 "다중 인터페이스 연계의 분산
 
 FinBridge는 이 요소들을 하나의 흐름으로 묶어, "다양한 금융 연계 인터페이스를 중앙에서 실행하고 추적하는 시스템"을 구현했다.
 
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;">
+<div style="background:#fff8e1;border-left:4px solid #f9a825;padding:14px 16px;border-radius:4px;">
+<p style="margin:0 0 10px;font-weight:bold;color:#e65100;">기존 상황</p>
+<ul style="margin:0;padding-left:18px;font-size:0.92em;line-height:1.8;">
+<li>프로토콜별 구현이 분산</li>
+<li>요청 단위 추적 ID 없음</li>
+<li>전체 성공 여부 판단 불가</li>
+<li>장애 시 각 로그를 개별 확인</li>
+</ul>
+</div>
+<div style="background:#e8f5e9;border-left:4px solid #43a047;padding:14px 16px;border-radius:4px;">
+<p style="margin:0 0 10px;font-weight:bold;color:#2e7d32;">FinBridge 해결</p>
+<ul style="margin:0;padding-left:18px;font-size:0.92em;line-height:1.8;">
+<li>단일 requestId로 전 프로토콜 추적</li>
+<li>통합 실행 → 통합 결과 한 번에</li>
+<li>overallStatus 자동 계산</li>
+<li>운영자가 한 화면에서 장애 파악</li>
+</ul>
+</div>
+</div>
+
 ---
 
 ## 3. 핵심 사용자
@@ -152,26 +173,15 @@ Kafka는 endpoint를 발행 topic으로 사용하고 timeoutMs를 메시지 발�
 
 구현된 범위:
 
-- `POST /api/integrate` 통합 요청 API
-- `GET /api/integrate/{requestId}` 상태 조회 API
-- `GET /api/logs` 시스템 로그 조회 API
-- SOAP, Kafka, SFTP, Batch, REST 어댑터
-- MySQL 기반 요청, 결과, 로그 저장
-- Flyway 기반 스키마 관리
-- Spring Batch 메타데이터 테이블 구성
-- Kafka DLT 흐름 구성
-- SFTP host key 고정 및 `StrictHostKeyChecking=yes`
-- Docker Compose 실행 환경
-- 단위 테스트, H2 기반 통합 테스트, Docker E2E 테스트
-- 기능 확인용 웹 콘솔
-- `POST /api/integrate/{requestId}/retry` 재처리 API
-- `GET/POST/PUT /api/interfaces` 인터페이스 등록 및 설정 관리 API
-- `GET /api/monitoring/summary` 모니터링 요약 API
-- `GET /api/performance/protocols` 프로토콜별 성능관리 API
-- 프로토콜 enabled/disabled 실행 반영
-- endpoint, timeoutMs 등 인터페이스 설정값의 Adapter 실행 반영
-- 인터페이스 관리 웹 콘솔 UI
-- 모니터링/성능관리 웹 콘솔 UI
+| 영역 | 구현 항목 |
+| --- | --- |
+| API | 통합 실행, 상태 조회, 로그 조회, 재처리, 인터페이스 등록/수정/조회, 모니터링 요약, 성능관리 |
+| 어댑터 | SOAP, Kafka, SFTP, Batch, REST |
+| 인프라 | MySQL + JPA, Flyway 스키마 관리, Docker Compose, Kafka DLT, Spring Batch 메타데이터 |
+| 설정 관리 | 프로토콜 enabled/disabled 실행 반영, endpoint · timeoutMs Adapter 전달 |
+| 보안 | SFTP `StrictHostKeyChecking=yes`, Docker host key 고정 |
+| 테스트 | 단위 테스트, H2 기반 통합 테스트, Docker E2E 테스트 |
+| UI | 실행 · 조회 · 인터페이스 관리 · 모니터링 · 재처리 · 성능관리 웹 콘솔 |
 
 MVP에서 제외한 범위:
 
